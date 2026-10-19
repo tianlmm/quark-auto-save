@@ -270,6 +270,10 @@ class Updater:
         cur = self.current_version()
         latest = self._resolve_latest(cfg)
         target = latest.get("version") or latest.get("tag")
+        if not force and not _is_newer(target, cur["build_tag"] or cur["version"]):
+            raise UpdateError(
+                f"当前版本 {cur['version']} 已不低于远端 {target}，无需更新（强制重装请勾选强制更新）"
+            )
         self.log(f"准备从 {cur['version']} 更新到 {target}（{latest.get('source')}）")
 
         blob = self._download(latest["url"], cfg)

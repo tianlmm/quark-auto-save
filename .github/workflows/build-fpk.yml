@@ -22,20 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: v
-        run: echo "version=$(cat VERSION | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
-
-  # 版本一致性：打 tag 时必须与 VERSION 相同，否则不发布
-  check-tag:
-    needs: meta
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - name: 校验 tag 与 VERSION
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          VER="${{ needs.meta.outputs.version }}"
-          echo "tag=$TAG VERSION=$VER"
-          [ "$TAG" = "$VER" ] || { echo "::error::tag v$TAG 与 VERSION $VER 不一致"; exit 1; }
+        run: echo "version=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
 
   build:
     needs: meta
@@ -50,6 +37,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      # 打 tag 时版本必须与 VERSION 一致，否则不进入构建（避免发出错版本）
+      - name: 校验 tag 与 VERSION
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VER="${{ needs.meta.outputs.version }}"
+          echo "tag=$TAG VERSION=$VER"
+          [ "$TAG" = "$VER" ] || { echo "::error::tag v$TAG 与 VERSION $VER 不一致"; exit 1; }
 
       - name: 构建 ${{ matrix.arch }} 包
         run: |
@@ -66,10 +62,11 @@ jobs:
         run: |
           set -e
           ls -l dist
-          # 外壳必须是 gzip tar，且带 manifest.checksum
           for f in dist/*.fpk; do
             tar -tzf "$f" | grep -qx 'manifest.checksum' || { echo "::error::$f 缺 manifest.checksum"; exit 1; }
-            tar -tzf "$f" | grep -qx 'app.tgz' || { echo "::error::$f 缺 app.tgz"; exit 1; }
+            tar -tzf "$f" | grep -qx 'app.tgz'          || { echo "::error::$f 缺 app.tgz"; exit 1; }
+            tar -xzOf "$f" app.tgz | tar -tzf - | grep -qx 'app/run.py' \
+              || { echo "::error::$f 内 app.tgz 缺 app/run.py"; exit 1; }
           done
 
       - uses: actions/upload-artifact@v4
@@ -90,25 +87,25 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
 
-  # 发布后自检：确认 release 资产可下载（内部更新走的就是这条链路）
+  # 发布后自检：确认 release 资产与源码包都在（内部更新走的就是源码包这条链路）
   verify-release:
     needs: [build, meta]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - name: 校验 release 与源码包
+      - name: 校验 release 资产
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
         run: |
           set -e
-          TAG="${GITHUB_REF_NAME}"
           API="https://api.github.com/repos/${GITHUB_REPOSITORY}"
           curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "$API/releases/tags/$TAG" -o rel.json
-          python3 - <<'PY'
+          python3 -c '
           import json
           d = json.load(open("rel.json"))
           names = [a["name"] for a in d.get("assets", [])]
           print("assets:", names)
           assert any(n.endswith(".fpk") for n in names), "release 没有 fpk 资产"
-          PY
-          echo "源码包：$API/tarball/$TAG （内部更新下载这个）"
+          '
+          echo "内部更新源码包：$API/tarball/$TAG"
