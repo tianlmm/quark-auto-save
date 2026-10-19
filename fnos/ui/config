@@ -1,0 +1,13 @@
+{
+  ".url": {
+    "quark-auto-save.panel": {
+      "title": "夸克自动转存",
+      "icon": "images/icon.png",
+      "type": "iframe",
+      "protocol": "",
+      "port": "5005",
+      "url": "/",
+      "allUsers": true
+    }
+  }
+}

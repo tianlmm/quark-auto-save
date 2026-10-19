@@ -1,0 +1,15 @@
+# 打包与更新产物
+dist/
+.update/
+*.fpk
+*.fpk.sha256
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# 本地运行数据
+config/
+build.json

@@ -1,0 +1,9 @@
+#!/bin/bash
+set -u
+VAR_DIR="${TRIM_PKGVAR:-/var/apps/quark-auto-save/var}"
+mkdir -p "${VAR_DIR}/config" 2>/dev/null || true
+# 升级前备份一份配置，防止向导/脚本误改
+if [ -f "${VAR_DIR}/config/quark_config.json" ]; then
+  cp "${VAR_DIR}/config/quark_config.json" "${VAR_DIR}/config/quark_config.json.bak-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+fi
+exit 0

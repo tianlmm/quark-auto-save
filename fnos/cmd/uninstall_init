@@ -1,0 +1,6 @@
+#!/bin/bash
+# 卸载前：交给系统先 stop（ctl_stop=true），这里只做兜底清理
+set -u
+APP_DIR="${TRIM_APPDEST:-/var/apps/quark-auto-save/target}"
+pkill -f "${APP_DIR}/app/run.py" 2>/dev/null || true
+exit 0

@@ -1,0 +1,77 @@
+#!/bin/bash
+# install_callback — 安装后：建 venv、装依赖、写默认配置与环境文件
+set -u
+APP_DIR="${TRIM_APPDEST:-/var/apps/quark-auto-save/target}"
+VAR_DIR="${TRIM_PKGVAR:-/var/apps/quark-auto-save/var}"
+LOG="${VAR_DIR}/install.log"
+mkdir -p "${VAR_DIR}/config" 2>/dev/null || true
+exec >>"${LOG}" 2>&1
+echo "===== install_callback $(date '+%F %T') ====="
+
+fail() {
+  echo "FAIL: $1"
+  [ -n "${TRIM_TEMP_LOGFILE:-}" ] && echo "安装失败：$1" > "${TRIM_TEMP_LOGFILE}"
+  exit 1
+}
+
+PY=""
+for cand in "${TRIM_SYS_PYTHON:-}" python3 /usr/bin/python3 /var/apps/python312/target/bin/python3; do
+  [ -n "${cand}" ] || continue
+  if command -v "${cand}" >/dev/null 2>&1; then PY="$(command -v "${cand}")"; break; fi
+done
+[ -n "${PY}" ] || fail "找不到 python3，无法创建运行环境"
+echo "python: ${PY} ($(${PY} -V 2>&1))"
+
+# 1. 虚拟环境
+if [ ! -x "${APP_DIR}/venv/bin/python" ]; then
+  "${PY}" -m venv "${APP_DIR}/venv" || fail "创建 venv 失败（需要 python3-venv）"
+fi
+
+# 2. 依赖（先镜像，失败回退官方源）
+INDEX="${wizard_pip_index:-https://pypi.tuna.tsinghua.edu.cn/simple}"
+echo "pip index: ${INDEX}"
+if ! "${APP_DIR}/venv/bin/pip" install -q --disable-pip-version-check -i "${INDEX}" \
+      -r "${APP_DIR}/requirements.txt"; then
+  echo "镜像源安装失败，回退官方 PyPI"
+  "${APP_DIR}/venv/bin/pip" install -q --disable-pip-version-check \
+      -r "${APP_DIR}/requirements.txt" || fail "依赖安装失败，请检查网络或 wizard_pip_index"
+fi
+
+# 3. 默认配置（不覆盖已有）
+if [ ! -f "${VAR_DIR}/config/quark_config.json" ]; then
+  cp "${APP_DIR}/quark_config.json" "${VAR_DIR}/config/quark_config.json" || fail "写入默认配置失败"
+fi
+
+# 4. 环境文件（供 service.sh source）——只放登录开关，更新配置写进 JSON
+ENV_FILE="${VAR_DIR}/env.sh"
+cat > "${ENV_FILE}" <<ENVEOF
+# 由 fnOS 安装向导生成，可在「应用设置」里改
+WEBUI_AUTH="${wizard_webui_auth:-off}"
+ENVEOF
+chmod 640 "${ENV_FILE}"
+
+# 4.1 内部更新配置写入 quark_config.json（WebUI 优先于环境变量）
+REPO="${wizard_update_repo:-tianlmm/quark-auto-save}"
+MODE="${wizard_update_mode:-auto}"
+CONF="${VAR_DIR}/config/quark_config.json"
+"${APP_DIR}/venv/bin/python" - "${CONF}" "${REPO}" "${MODE}" <<'PYEOF' || echo "WARN: 写入 update 配置失败"
+import json, sys
+path, repo, mode = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path, encoding="utf-8") as f:
+    conf = json.load(f)
+upd = conf.setdefault("update", {})
+upd.setdefault("repo", repo)
+upd.setdefault("mode", mode)
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(conf, f, ensure_ascii=False, indent=2)
+print(f"update.repo={upd.get('repo')} update.mode={upd.get('mode')}")
+PYEOF
+
+# 5. 更新功能所需的写权限（代码目录由服务用户持有）
+chown -R "$(id -u quarkauto 2>/dev/null || echo "$(id -u)"):$(id -g quarkauto 2>/dev/null || echo "$(id -g)")" \
+  "${APP_DIR}" 2>/dev/null || true
+chmod -R a+rX "${APP_DIR}" 2>/dev/null || true
+chmod u+w "${APP_DIR}" 2>/dev/null || true
+
+echo "OK: venv + deps + config ready"
+exit 0

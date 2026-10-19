@@ -1,0 +1,4 @@
+#!/bin/bash
+# upgrade_callback — 升级后重装依赖；配置与数据保留
+set -u
+exec "$(dirname "$0")/install_callback"

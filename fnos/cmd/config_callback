@@ -1,0 +1,40 @@
+#!/bin/bash
+# config_callback — 应用设置保存后重写环境文件与更新配置
+set -u
+APP_DIR="${TRIM_APPDEST:-/var/apps/quark-auto-save/target}"
+VAR_DIR="${TRIM_PKGVAR:-/var/apps/quark-auto-save/var}"
+LOG="${VAR_DIR}/install.log"
+mkdir -p "${VAR_DIR}/config" 2>/dev/null || true
+exec >>"${LOG}" 2>&1
+echo "===== config_callback $(date '+%F %T') ====="
+
+AUTH="${wizard_webui_auth:-off}"
+case "${AUTH}" in on|off) ;; *) echo "非法 webui_auth=${AUTH}，回退 off"; AUTH="off" ;; esac
+
+cat > "${VAR_DIR}/env.sh" <<ENVEOF
+# 由 fnOS 应用设置生成
+WEBUI_AUTH="${AUTH}"
+ENVEOF
+chmod 640 "${VAR_DIR}/env.sh"
+echo "env.sh 已更新：WEBUI_AUTH=${AUTH}"
+
+REPO="${wizard_update_repo:-}"
+MODE="${wizard_update_mode:-}"
+if [ -n "${REPO}" ] || [ -n "${MODE}" ]; then
+  "${APP_DIR}/venv/bin/python" - "${VAR_DIR}/config/quark_config.json" "${REPO}" "${MODE}" <<'PYEOF' || echo "WARN: 更新 update 配置失败"
+import json, sys
+path, repo, mode = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path, encoding="utf-8") as f:
+    conf = json.load(f)
+upd = conf.setdefault("update", {})
+if repo:
+    upd["repo"] = repo
+if mode:
+    upd["mode"] = mode
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(conf, f, ensure_ascii=False, indent=2)
+print(f"update.repo={upd.get('repo')} update.mode={upd.get('mode')}")
+PYEOF
+fi
+echo "提示：端口/登录开关变更后需停止再启动应用生效"
+exit 0

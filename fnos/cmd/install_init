@@ -1,0 +1,8 @@
+#!/bin/bash
+# install_init — 安装前准备：目录骨架 + 权限自愈
+set -u
+mkdir -p "${TRIM_PKGVAR:-/var/apps/quark-auto-save/var}/config" 2>/dev/null || true
+mkdir -p "${TRIM_APPDEST:-/var/apps/quark-auto-save/target}" 2>/dev/null || true
+# 包里若权限过严，服务用户会读不到
+chmod -R a+rX "${TRIM_APPDEST:-/var/apps/quark-auto-save/target}" 2>/dev/null || true
+exit 0

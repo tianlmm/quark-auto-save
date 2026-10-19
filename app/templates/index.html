@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>夸克自动转存</title>
+  <!-- CSS -->
+  <link rel="stylesheet" href="./static/css/bootstrap.min.css">
+  <link rel="stylesheet" href="./static/css/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="./static/css/dashboard.css">
+  <!-- Bootstrap JS -->
+  <script src="./static/js/jquery-3.5.1.slim.min.js"></script>
+  <script src="./static/js/bootstrap.bundle.min.js"></script>
+  <!-- Vue.js -->
+  <script src="./static/js/vue@2.js"></script>
+  <script src="./static/js/axios.min.js"></script>
+  <script src="./static/js/v-jsoneditor.min.js"></script>
+</head>
+
+<body>
+  <div id="app">
+
+    <nav class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0">
+      <a class="navbar-brand col-md-3 col-lg-2 mr-0 px-3" href="#"><i class="bi bi-clouds"></i> 夸克自动转存</a>
+      <button class="navbar-toggler position-absolute d-md-none collapsed" type="button" data-toggle="collapse" data-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="菜单">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+    </nav>
+
+    <div class="container-fluid">
+      <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+        <div class="sidebar-sticky pt-3">
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a class="nav-link" href="#" :class="{active: activeTab === 'config'}" @click="changeTab('config')">
+                <i class="bi bi-gear-fill"></i> 系统配置
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" :class="{active: activeTab === 'tasklist'}" @click="changeTab('tasklist')">
+                <i class="bi bi-list-task"></i> 任务列表
+              </a>
+            </li>
+          </ul>
+          <div class="nav-bottom text-center">
+            <p class="position-relative" hidden>
+              <b class="text-success"><i class="bi bi-record-circle mr-1"></i>视频教程</b>
+              <span class="position-absolute qrcode-tutorial">
+                使用夸克扫码查看<br>
+                <img src="./static/img/qrcode_tutorial.png">
+              </span>
+            </p>
+            <p><a target="_blank" href="https://github.com/Cp0204/quark-auto-save"><i class="bi bi-github mr-1"></i>quark-auto-save</a></p>
+            <div class="update-box small">
+              <div class="text-muted">当前版本 <span class="font-weight-bold">{{ version }}</span></div>
+              <div v-if="upd.latest" class="text-muted">
+                最新 <span class="font-weight-bold">{{ upd.latest }}</span>
+                <span class="badge badge-success" v-if="upd.can_update">可更新</span>
+                <span class="badge badge-secondary" v-else>已最新</span>
+              </div>
+              <div class="mt-1">
+                <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="upd.busy"
+                        @click="checkUpdate(false)">
+                  <i class="bi bi-arrow-repeat" :class="{'spin': upd.checking}"></i> 检查更新
+                </button>
+                <button type="button" class="btn btn-sm btn-primary" v-if="upd.can_update"
+                        :disabled="upd.busy" @click="applyUpdate()">
+                  <i class="bi bi-download"></i> 更新
+                </button>
+              </div>
+              <div class="text-danger mt-1" v-if="upd.error">{{ upd.error }}</div>
+              <div class="text-muted mt-1" v-if="upd.message">{{ upd.message }}</div>
+              <div class="text-muted mt-1" v-if="upd.detail">{{ upd.detail }}</div>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <main class="col-md-9 col-lg-10 ml-sm-auto">
+        <form @submit.prevent="saveConfig" @keydown.enter.prevent>
+
+          <div v-if="activeTab === 'config'">
+            <div class="row title">
+              <div class="col-10">
+                <h2><i class="bi bi-cookie"></i> Cookie</h2>
+              </div>
+              <div class="col-2 text-right">
+                <button type="button" class="btn btn-outline-primary" @click="addCookie()">+</button>
+              </div>
+            </div>
+            <p>1. 所有账号执行签到，纯<a class="" href="https://github.com/Cp0204/quark-auto-save/wiki/使用技巧集锦#每日签到领空间">签到</a>只需移动端参数即可！</p>
+            <p>2. 仅第一个账号执行转存，请自行确认顺序。<b>最好是手机验证码<a target="_blank" href="https://pan.quark.cn/">登录</a>，CK比较完整！</b>如需签到参数附在CK后面。</p>
+            <div v-for="(value, index) in formData.cookie" :key="index" class="input-group mb-2">
+              <input :type="cookieVisible[index] ? 'text' : 'password'" v-model="formData.cookie[index]" class="form-control" placeholder="打开 pan.quark.com 按 F12 抓取" autocomplete="off" autocapitalize="off" autocorrect="off">
+              <div class="input-group-append">
+                <button type="button" class="btn btn-outline-secondary" :title="cookieVisible[index] ? '隐藏 Cookie' : '显示 Cookie'" @click="toggleCookie(index)">
+                  <i :class="cookieVisible[index] ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                </button>
+                <button type="button" class="btn btn-outline-danger" title="删除此 Cookie" @click="removeCookie(index)">-</button>
+              </div>
+            </div>
+
+            <div class="row title">
+              <div class="col">
+                <h2 style="display: inline-block;"><i class="bi bi-clock"></i> 定时规则</h2>
+                <span class="badge badge-pill badge-light">
+                  <a target="_blank" href="https://tool.lu/crontab/" title="CRON时间计算器">?</a>
+                </span>
+              </div>
+            </div>
+            <div class="input-group mb-2">
+              <div class="input-group-prepend">
+                <span class="input-group-text">Crontab</span>
+              </div>
+              <input type="text" v-model="formData.crontab" class="form-control" placeholder="必填">
+            </div>
+
+            <div class="row title" title="通知推送，支持多个渠道，见Wiki">
+              <div class="col-8">
+                <h2 style="display: inline-block;"><i class="bi bi-bell"></i> 通知</h2>
+                <span class="badge badge-pill badge-light">
+                  <a href="https://github.com/Cp0204/quark-auto-save/wiki/通知推送服务配置" target="_blank">?</a>
+                </span>
+              </div>
+              <div class="col-4 text-right">
+                <button type="button" class="btn btn-success" title="通知推送测试" @click="testPush()"><i class="bi bi-lightning"></i></button>
+                <button type="button" class="btn btn-outline-primary" @click="addPush()">+</button>
+              </div>
+            </div>
+            <div v-for="(value, key) in formData.push_config" :key="key" class="input-group mb-2">
+              <div class="input-group-prepend">
+                <span class="input-group-text">{{ key }}</span>
+              </div>
+              <div class="input-group-prepend" v-if="(key == 'DEER_KEY' || key == 'PUSH_KEY')">
+                <a type="button" class="btn btn-warning" target="_blank" href="https://sct.ftqq.com/r/13249" title="Server酱推荐计划"><i class="bi bi-award"></i></a>
+              </div>
+              <input type="text" v-model="formData.push_config[key]" class="form-control">
+              <div class="input-group-append">
+                <button type="button" class="btn btn-outline-danger" @click="removePush(key)">-</button>
+              </div>
+            </div>
+
+            <div class="row title" v-if="Object.keys(getAvailablePlugins(formData.plugins)).length" title="各插件的配置选项，具体键值由插件定义，见Wiki">
+              <div class="col">
+                <h2 style="display: inline-block;"><i class="bi bi-plug"></i> 插件</h2>
+                <span class="badge badge-pill badge-light">
+                  <a href="https://github.com/Cp0204/quark-auto-save/wiki/插件配置" target="_blank">?</a>
+                </span>
+              </div>
+            </div>
+            <div v-for="(plugin, pluginName) in getAvailablePlugins(formData.plugins)" :key="pluginName">
+              <div class="form-group row mb-0" style="display:flex; align-items:center;">
+                <div data-toggle="collapse" :data-target="'#collapse_'+pluginName" aria-expanded="true" :aria-controls="'collapse_'+pluginName">
+                  <div class="btn btn-block text-left">
+                    <i class="bi bi-caret-right-fill"></i> <span>{{ pluginName }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="collapse ml-3 mt-2" :id="'collapse_'+pluginName">
+                <template v-for="(value, key) in plugin" :key="key">
+                  <div v-if="key.startsWith('tips_')">
+                    <div class="alert alert-warning" role="alert">{{ value }}</div>
+                  </div>
+                  <div v-else-if="typeof value === 'boolean'" class="form-group row mb-2">
+                    <label class="col-sm-2 col-form-label">{{ key }}</label>
+                    <div class="col-sm-10 d-flex align-items-center">
+                      <input type="checkbox" class="form-check-input ml-0 mt-0" v-model="formData.plugins[pluginName][key]">
+                    </div>
+                  </div>
+                  <div v-else class="form-group row">
+                    <label class="col-sm-2 col-form-label">{{ key }}</label>
+                    <div class="col-sm-10">
+                      <input :type="key.includes('password') || key.includes('token') || key.includes('secret') ? 'password' : 'text'" v-model="formData.plugins[pluginName][key]" class="form-control">
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="row title" title="预定义的正则匹配规则，在任务列表中可直接点击使用">
+              <div class="col-10">
+                <h2 style="display: inline-block;"><i class="bi bi-magic"></i> 魔法匹配</h2>
+                <span class="badge badge-pill badge-light">
+                  <a href="https://github.com/Cp0204/quark-auto-save/wiki/正则处理教程#21-魔法匹配" target="_blank">?</a>
+                </span>
+              </div>
+              <div class="col-2 text-right">
+                <button type="button" class="btn btn-outline-primary" @click="addMagicRegex()">+</button>
+              </div>
+            </div>
+            <div v-for="(value, key) in formData.magic_regex" :key="key" class="form-group mb-2 magic-regex-group">
+              <div class="input-group">
+                <div class="input-group-prepend">
+                  <span class="input-group-text">魔法名</span>
+                </div>
+                <input type="text" :data-oldkey="key" v-model="key" class="form-control" @change="updateMagicRegexKey($event.target.dataset.oldkey, $event.target.value)" placeholder="自定义名称">
+                <div class="input-group-prepend">
+                  <span class="input-group-text">正则处理</span>
+                </div>
+                <input type="text" v-model="value.pattern" class="form-control" placeholder="匹配表达式">
+                <input type="text" v-model="value.replace" class="form-control" placeholder="替换表达式">
+                <div class="input-group-append">
+                  <button type="button" class="btn btn-outline-danger" @click="removeMagicRegex(key)">-</button>
+                </div>
+              </div>
+            </div>
+
+
+            <div class="row title" title="API接口，用以第三方添加任务等操作，见Wiki">
+              <div class="col-10">
+                <h2 style="display: inline-block;"><i class="bi bi-link-45deg"></i> API</h2>
+                <span class="badge badge-pill badge-light">
+                  <a href="https://github.com/Cp0204/quark-auto-save/wiki/API接口" target="_blank">?</a>
+                </span>
+              </div>
+            </div>
+            <div class="input-group">
+              <div class="input-group-prepend">
+                <span class="input-group-text">Token</span>
+              </div>
+              <input type="text" v-model="formData.api_token" class="form-control" style="background-color:white;" disabled>
+            </div>
+
+            <div class="row title" title="资源搜索服务配置，用于任务名称智能搜索">
+              <div class="col-10">
+                <h2 style="display: inline-block;"><i class="bi bi-search"></i> 资源搜索</h2>
+              </div>
+            </div>
+            <div class="form-group row mb-0" style="display:flex; align-items:center;">
+              <div data-toggle="collapse" data-target="#collapse_cloudsaver" aria-expanded="true" aria-controls="collapse_cloudsaver">
+                <div class="btn btn-block text-left">
+                  <i class="bi bi-caret-right-fill"></i> CloudSaver
+                  <span class="badge badge-pill badge-light">
+                    <a href="https://github.com/Cp0204/quark-auto-save/wiki/CloudSaver搜索源" target="_blank">?</a>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="collapse show ml-3" id="collapse_cloudsaver">
+              <div class="form-group row">
+                <label class="col-sm-2 col-form-label">启用</label>
+                <div class="col-sm-10 d-flex align-items-center">
+                  <input type="checkbox" v-model="formData.source.cloudsaver.enable" placeholder="是否启用CloudSaver搜索，默认启用">
+                </div>
+              </div>
+              <div class="form-group row">
+                <label class="col-sm-2 col-form-label">服务器</label>
+                <div class="col-sm-10">
+                  <input type="text" v-model="formData.source.cloudsaver.server" class="form-control" placeholder="资源搜索服务器地址，如 http://172.17.0.1:8008">
+                </div>
+              </div>
+              <div class="form-group row">
+                <label class="col-sm-2 col-form-label">用户名</label>
+                <div class="col-sm-10">
+                  <input type="text" v-model="formData.source.cloudsaver.username" class="form-control" placeholder="用户名">
+                </div>
+              </div>
+              <div class="form-group row">
+                <label class="col-sm-2 col-form-label">密码</label>
+                <div class="col-sm-10">
+                  <input type="password" v-model="formData.source.cloudsaver.password" class="form-control" placeholder="密码">
+                </div>
+              </div>
+            </div>
+            <div class="form-group row mb-0" style="display:flex; align-items:center;">
+              <div data-toggle="collapse" data-target="#collapse_pansou" aria-expanded="true" aria-controls="collapse_pansou">
+                <div class="btn btn-block text-left">
+                  <i class="bi bi-caret-right-fill"></i> PanSou
+                  <span class="badge badge-pill badge-light">
+                    <a href="https://github.com/fish2018/pansou" target="_blank">?</a>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="collapse show ml-3" id="collapse_pansou">
+              <div class="form-group row">
+                <label class="col-sm-2 col-form-label">启用</label>
+                <div class="col-sm-10 d-flex align-items-center">
+                  <input type="checkbox" v-model="formData.source.pansou.enable" placeholder="是否启用PanSou搜索，默认启用">
+                </div>
+              </div>
+              <div class="form-group row">
+                <label class="col-sm-2 col-form-label">服务器</label>
+                <div class="col-sm-10">
+                  <input type="text" v-model="formData.source.pansou.server" class="form-control" placeholder="资源搜索服务器地址，如 https://so.252035.xyz">
+                </div>
+              </div>
+            </div>
+            <div class="form-group row mt-2" title="定时任务检测到分享链接失效（含历史已标记失效任务）时，自动通过上述搜索源查找候选，逐个验证后替换为第一个有效链接并继续转存；找不到有效资源时仍会标记失效。建议标题规范的剧集类任务开启，合集类资源可能换错。">
+              <label class="col-sm-2 col-form-label">自动换链</label>
+              <div class="col-sm-10 d-flex align-items-center">
+                <div class="input-group-text">
+                  <input type="checkbox" v-model="formData.source.auto_repair.enable">&nbsp;链接失效时自动搜索替换（无需人工处理）
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div v-if="activeTab === 'tasklist'">
+            <div class="row title">
+              <div class="col">
+                <h2>任务列表</h2>
+              </div>
+            </div>
+            <hr>
+            <div class="row">
+              <div class="col-lg-6 col-md-12">
+                <div class="row">
+                  <label class="col-form-label col-md-3">名称筛选</label>
+                  <div class="input-group col-md-9">
+                    <input type="text" class="form-control" v-model="taskNameFilter" placeholder="名称 筛选/搜索">
+                    <div class="input-group-append">
+                      <button type="button" class="btn btn-outline-secondary" @click="clearData('taskNameFilter')"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-6 col-md-12">
+                <div class="row">
+                  <label class="col-form-label col-md-3">路径筛选</label>
+                  <div class="input-group col-md-9">
+                    <select class="form-control" v-model="taskDirSelected">
+                      <option v-for="(dir, index) in taskDirs" :value="dir">{{ dir }}</option>
+                    </select>
+                    <div class="input-group-append">
+                      <button type="button" class="btn btn-outline-secondary" @click="clearData('taskDirSelected')"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-for="(task, index) in formData.tasklist" :key="index" class="task mb-3">
+              <template v-if="(taskDirSelected == '' || getParentDirectory(task.savepath) == taskDirSelected) && task.taskname.includes(taskNameFilter)">
+                <hr>
+                <div class="form-group row task-header" style="align-items:center">
+                  <div class="col pl-0" data-toggle="collapse" :data-target="'#collapse_'+index" aria-expanded="true" :aria-controls="'collapse_'+index">
+                    <div class="btn btn-block text-left task-title-btn">
+                      <i class="bi bi-caret-right-fill"></i> #<span class="task-title-text">{{ index+1 }}: {{ task.taskname }}</span>
+                    </div>
+                  </div>
+                  <div class="col-auto task-actions">
+                    <button type="button" class="btn btn-outline-primary btn-sm" @click="copyTaskToClipboard(index)" title="复制任务参数到粘贴板"><i class=" bi bi-clipboard-check-fill"></i></button>
+                    <button type="button" class="btn btn-warning btn-sm" v-if="task.shareurl_ban" @click="repairShareurl(index, task)" :title="'链接已失效，点击搜索可用链接修复：' + task.shareurl_ban"><i class="bi bi-wrench"></i></button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" @click="runScriptNow(index)" title="运行此任务" v-else><i class="bi bi-play-fill"></i></button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" @click="removeTask(index)" title="删除此任务"><i class="bi bi-trash3-fill"></i></button>
+                  </div>
+                </div>
+                <div class="collapse ml-3" :id="'collapse_'+index">
+                  <div class="alert alert-warning d-flex justify-content-between align-items-center" role="alert" v-if="task.shareurl_ban">
+                    <span class="mr-2">{{ task.shareurl_ban }}</span>
+                    <button type="button" class="btn btn-sm btn-warning flex-shrink-0" @click="repairShareurl(index, task)">
+                      <i v-if="smart_param.isSearching && smart_param.index === index" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></i>
+                      <i v-else class="bi bi-search-heart"></i>
+                      搜索可用链接修复
+                    </button>
+                  </div>
+                  <div class="form-group row">
+                    <label class="col-sm-2 col-form-label">任务名称</label>
+                    <div class="col-sm-10">
+                      <div class="input-group task-name-group">
+                        <input type="text" name="taskname[]" class="form-control" v-model="task.taskname" placeholder="必填" @focus="smart_param.showSuggestions=true;focusTaskname(index, task)" @input="changeTaskname(index, task)">
+                        <div class="dropdown-menu show task-suggestions" v-if="smart_param.showSuggestions && smart_param.taskSuggestions.success && smart_param.index === index">
+                          <div class="dropdown-item text-muted text-center" style="font-size:12px;">
+                            <span v-if="smart_param.isVerifying" class="mr-1"><i class="spinner-border spinner-border-sm" role="status"></i> 正在检查链接有效性...</span>
+                            <span v-else>{{ smart_param.taskSuggestions.message ? smart_param.taskSuggestions.message : smart_param.taskSuggestions.data.length ? `以下资源来自网络搜索，请自行辨识，如有侵权请联系资源方` : "未搜索到资源" }}</span>
+                          </div>
+                          <div v-for="(suggestion, sIndex) in smart_param.taskSuggestions.data" :key="suggestion.shareurl" class="dropdown-item cursor-pointer" @click.prevent="selectSuggestion(index, suggestion)" style="font-size: 12px;" :title="suggestion.content">
+                            <span>{{ suggestion.verify === true ? '✅' : suggestion.verify === false ? '❌' : '❔' }}</span> {{ suggestion.taskname }}
+                            <small class="text-muted">
+                              <a :href="suggestion.shareurl" target="_blank" @click.stop>{{ suggestion.shareurl }}</a>
+                            </small>
+                            <span class="badge bg-transparent border border-success text-success">{{ suggestion.source || "网络公开" }}</span>
+                            <span class="badge bg-transparent border border-info text-info">{{ suggestion.channel }}</span>
+                            <span v-if="suggestion.datetime" class="badge bg-transparent border border-dark text-dark">{{ suggestion.datetime }}</span>
+                          </div>
+                        </div>
+                        <div class="input-group-append" title="深度搜索">
+                          <button class="btn btn-primary" type="button" @click="searchSuggestions(index, task.taskname)">
+                            <i v-if="smart_param.isSearching && smart_param.index === index" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></i>
+                            <i v-else class="bi bi-search-heart"></i>
+                          </button>
+                          <div class="input-group-text" title="谷歌搜索">
+                            <a target="_blank" :href="`https://www.google.com/search?q=%22pan.quark.cn/s%22+${task.taskname}`"><i class="bi bi-google"></i></a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="form-group row" title="支持子目录链接，Web端打开分享点入目录，复制浏览器的URL即可；支持带提取码链接，说明见Wiki">
+                    <label class="col-sm-2 col-form-label">分享链接</label>
+                    <div class="col-sm-10">
+                      <div class="input-group">
+                        <input type="text" name="shareurl[]" class="form-control" v-model="task.shareurl" placeholder="必填" @blur="changeShareurl(task)">
+                        <div class="input-group-append" v-if="task.shareurl">
+                          <button type="button" class="btn btn-outline-secondary" @click="fileSelect.selectDir=true;fileSelect.switchShare=false;fileSelect.previewRegex=false;fileSelect.sortBy='file_name';fileSelect.sortOrder='desc';showShareSelect(index)" title="选择文件夹"><i class="bi bi-folder"></i></button>
+                          <div class="input-group-text">
+                            <a target="_blank" :href="task.shareurl"><i class="bi bi-box-arrow-up-right"></i></a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="form-group row">
+                    <label class="col-sm-2 col-form-label">保存路径</label>
+                    <div class="col-sm-10">
+                      <div class="input-group">
+                        <input type="text" name="savepath[]" class="form-control" v-model="task.savepath" placeholder="必填" @focus="focusTaskname(index, task)">
+                        <div class="input-group-append">
+                          <button class="btn btn-secondary" type="button" v-if="smart_param.savepath && smart_param.index == index && task.savepath != smart_param.origin_savepath" @click="task.savepath = smart_param.origin_savepath"><i class="bi bi-reply"></i></button>
+                          <button class="btn btn-outline-secondary" type="button" @click="fileSelect.sortBy='file_name';fileSelect.sortOrder='asc';showSavepathSelect(index)">选择</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="form-group row" title="可用作筛选，只转存匹配到的文件名的文件，留空则转存所有文件">
+                    <label class="col-sm-2 col-form-label">保存规则</label>
+                    <div class="col-sm-10">
+                      <div class="input-group">
+                        <div class="input-group-prepend">
+                          <button class="btn btn-outline-secondary" type="button" @click="fileSelect.selectDir=true;fileSelect.switchShare=false;fileSelect.previewRegex=true;fileSelect.sortBy='file_name';fileSelect.sortOrder='asc';showShareSelect(index)" title="预览正则处理效果">正则处理</button>
+                        </div>
+                        <input type="text" name="pattern[]" class="form-control" v-model="task.pattern" placeholder="匹配表达式" list="magicRegex" @dblclick="inputRawMagicRegex(task)" title="双击可将魔法匹配释放为填入原始正则表达式">
+                        <input type="text" name="replace[]" class="form-control" v-model="task.replace" placeholder="替换表达式">
+                        <div class="input-group-append" title="保存时只比较文件名的部分，01.mp4 和 01.mkv 视同为同一文件，不重复转存">
+                          <div class="input-group-text">
+                            <input type="checkbox" v-model="task.ignore_extension">&nbsp;忽略后缀
+                          </div>
+                        </div>
+                      </div>
+                      <datalist id="magicRegex">
+                        <option v-for="(value, key) in formData.magic_regex" :key="key" :value="`${key}`">{{ value.pattern }} → {{ value.replace }}</option>
+                      </datalist>
+                    </div>
+                  </div>
+                  <div class="form-group row" title="只转存修改日期>选中文件的文件，在容量不够或几百集动漫的场景下非常有用">
+                    <label class="col-sm-2 col-form-label">文件起始</label>
+                    <div class="col-sm-10">
+                      <div class="input-group">
+                        <input type="text" class="form-control" placeholder="可选，只转存修改日期>此文件的文件" name="startfid[]" v-model="task.startfid">
+                        <div class="input-group-append" v-if="task.shareurl">
+                          <button class="btn btn-outline-secondary" type="button" @click="fileSelect.selectDir=false;fileSelect.switchShare=false;fileSelect.previewRegex=false;fileSelect.sortBy='updated_at';fileSelect.sortOrder='desc';showShareSelect(index)">选择</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="form-group row" title="需匹配到各级嵌套目录名才会更新，否则子目录在第一次转存后不会更新。注意：递归模式原理是逐级索引，深层嵌套目录的场景下效率非常低，慎用 .*">
+                    <label class="col-sm-2 col-form-label">更新目录</label>
+                    <div class="col-sm-10">
+                      <div class="input-group">
+                        <input type="text" name="update_subdir[]" class="form-control" v-model="task.update_subdir" placeholder="可选，匹配需更新子目录（含各级嵌套目录）的正则表达式，多项以|分割，如 4k|1080p">
+                        <div class="input-group-append" title="重存模式：删除该目录下所有文件，重新转存，大资源包时推荐使用&#x0A;不勾选为递归模式：递归检查，逐级更新嵌套目录，效率低">
+                          <div class="input-group-text">
+                            <input type="checkbox" v-model="task.update_subdir_resave_mode">&nbsp;重存模式
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="form-group row">
+                    <label class="col-sm-2 col-form-label">截止日期</label>
+                    <div class="col-sm-10">
+                      <input type="date" name="enddate[]" class="form-control" v-model="task.enddate" placeholder="可选">
+                    </div>
+                  </div>
+                  <div class="form-group row" title="只在勾选的星期时才运行，在某些周更剧的场景下非常有用">
+                    <label class="col-sm-2 col-form-label">运行星期</label>
+                    <div class="col-sm-10 col-form-label weekday-group">
+                      <div class="form-check form-check-inline" title="也可用作任务总开关">
+                        <input class="form-check-input" type="checkbox" :checked="task.runweek.length === 7" @change="toggleAllWeekdays(task)" :indeterminate.prop="task.runweek.length > 0 && task.runweek.length < 7">
+                        <label class="form-check-label">全选</label>
+                      </div>
+                      <div class="form-check form-check-inline" v-for="(day, index) in weekdays" :key="index">
+                        <input class="form-check-input" type="checkbox" v-model="task.runweek" :value="index+1">
+                        <label class="form-check-label" v-html="day"></label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="form-group row" v-if="Object.keys(getAvailablePlugins(formData.plugins)).length" title="单个任务的插件选项，具体键值由插件定义，见Wiki">
+                    <label class="col-sm-2 col-form-label">插件选项</label>
+                    <div class="col-sm-10">
+                      <v-jsoneditor v-model="task.addition" :options="{mode:'tree'}" :plus="false" height="180px"></v-jsoneditor>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div class="row mt-5">
+              <div class="col-sm-12 text-center">
+                <div class="btn-group" role="group" aria-label="任务操作">
+                  <button type="button" class="btn btn-primary" @click="addTask()"><i class="bi bi-plus"></i> 增加任务</button>
+                  <button type="button" class="btn btn-primary" @click="addTaskForClipboard()" title="从粘贴板导入"><i class="bi bi-clipboard-plus"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bottom-buttons">
+            <button class="btn btn-success" data-toggle="tooltip" data-placement="top" title="保存 CTRL+S"><i class="bi bi-floppy2-fill"></i></button>
+            <button type="button" class="btn btn-primary" data-toggle="tooltip" data-placement="top" title="运行 CTRL+R" @click="runScriptNow()"><i class="bi bi-play-fill"></i></button>
+            <button type="button" class="btn btn-info" data-toggle="tooltip" data-placement="top" title="单击回顶，双击到底" @click="scrollToX(0)" @dblclick="scrollToX()"><i class="bi bi-chevron-bar-up"></i></button>
+          </div>
+        </form>
+      </main>
+    </div>
+
+    <!-- 模态框 运行日志 -->
+    <div class="modal" tabindex="-1" id="logModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><b>运行日志</b>
+              <div v-if="modalLoading" class="spinner-border spinner-border-sm m-1" role="status"></div>
+            </h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <pre>{{ run_log }}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模态框 文件选择 -->
+    <div class="modal" tabindex="-1" id="fileSelectModal">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <b v-if="fileSelect.previewRegex">正则处理预览</b>
+              <b v-else-if="fileSelect.selectDir">选择{{fileSelect.selectShare ? '需转存的' : '保存到的'}}文件夹</b>
+              <b v-else>选择起始文件</b>
+              <div v-if="modalLoading" class="spinner-border spinner-border-sm m-1" role="status"></div>
+            </h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body small">
+            <!-- 分享链接来源 -->
+            <div class="mb-3 row" v-if="fileSelect.switchShare">
+              <div class="col-sm-8">
+                <div>
+                  <b>名称：</b>
+                  <span :title="fileSelect.share.content">{{ fileSelect.share.taskname }}</span>
+                </div>
+                <div>
+                  <b>链接：</b>
+                  <a :href="fileSelect.share.shareurl" target="_blank" @click.stop>{{ fileSelect.share.shareurl }}</a>
+                </div>
+                <div>
+                  <b>来源：</b>
+                  <span class="badge bg-transparent border border-success text-success">{{ fileSelect.share.source || "网络公开" }}</span>
+                  <span class="badge bg-transparent border border-info text-info" v-if="fileSelect.share.channel">{{ fileSelect.share.channel }}</span>
+                </div>
+                <div v-if="fileSelect.share.datetime">
+                  <b>时间：</b>
+                  <span>{{ fileSelect.share.datetime }}</span>
+                </div>
+              </div>
+              <div class="col-sm-4 text-right">
+                <div class="btn-group" title="资源搜索结果切换">
+                  <button type="button" class="btn btn-sm btn-outline-primary" @click="switchShare(-1)">上一个</button>
+                  <button type="button" class="btn btn-sm btn-outline-primary" @click="switchShare(1)">下一个</button>
+                </div>
+              </div>
+            </div>
+            <div class="alert alert-warning" v-if="fileSelect.error">{{ fileSelect.error }}</div>
+            <div v-else>
+              <!-- 正则处理表达式 -->
+              <div class="mb-3" v-if="fileSelect.previewRegex && fileSelect.index<this.formData.tasklist.length">
+                <div><b>匹配表达式：</b><span class="badge badge-info">{{ formData.tasklist[fileSelect.index].pattern }}</span>
+                  <span class="badge badge-info" v-if="formData.tasklist[fileSelect.index].pattern in formData.magic_regex">{{ formData.magic_regex[formData.tasklist[fileSelect.index].pattern].pattern }}</span>
+                </div>
+                <div><b>替换表达式：</b><span class="badge badge-info" v-if="formData.tasklist[fileSelect.index].replace">{{ formData.tasklist[fileSelect.index].replace }}</span>
+                  <span class="badge badge-info" v-else-if="formData.tasklist[fileSelect.index].pattern in formData.magic_regex">{{ formData.magic_regex[formData.tasklist[fileSelect.index].pattern].replace }}</span>
+                </div>
+              </div>
+              <!-- 面包屑导航 -->
+              <nav aria-label="breadcrumb" v-if="fileSelect.selectDir">
+                <ol class="breadcrumb">
+                  <li class="breadcrumb-item cursor-pointer" @click="navigateTo('0','/')"><i class="bi bi-house-door"></i></li>
+                  <li v-for="(item, index) in fileSelect.paths" class="breadcrumb-item">
+                    <a v-if="index != fileSelect.paths.length - 1" href="#" @click="navigateTo(item.fid, item.name)">{{ item.name }}</a>
+                    <span v-else class="text-muted">{{ item.name }}</span>
+                  </li>
+                </ol>
+              </nav>
+              <!-- 文件列表 -->
+              <div class="table-responsive">
+                <table class="table table-hover table-sm">
+                  <thead>
+                    <tr>
+                      <th scope="col" class="cursor-pointer" @click="sortFileList('file_name')">
+                        文件名
+                        <span v-if="fileSelect.sortBy === 'file_name'">{{ fileSelect.sortOrder === "asc" ? "↑" : "↓" }}</span>
+                      </th>
+                      <th scope="col" v-if="fileSelect.selectShare">
+                        正则处理
+                      </th>
+                      <template v-if="!fileSelect.previewRegex">
+                        <th scope="col">
+                          大小
+                        </th>
+                        <th scope="col" class="cursor-pointer" @click="sortFileList('updated_at')">
+                          修改日期
+                          <span v-if="fileSelect.sortBy === 'updated_at'">{{ fileSelect.sortOrder === "asc" ? "↑" : "↓" }}</span>
+                        </th>
+                        <th scope="col" v-if="!fileSelect.selectShare">
+                          操作
+                        </th>
+                      </template>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(file, key) in fileSelect.fileList" :key="key" @click="fileSelect.selectDir ? (file.dir ? navigateTo(file.fid, file.file_name) : null) : selectStartFid(file.fid)" :class="{'cursor-pointer': fileSelect.selectDir ? file.dir : true}">
+                      <td><i class="bi mr-1" :class="file.dir ? 'bi-folder-fill text-warning' : 'bi-file-earmark'"></i>{{file.file_name}}</td>
+                      <td v-if="fileSelect.selectShare" :class="file.file_name_re ? 'text-success' : file.file_name_saved ? 'text-muted' : 'text-danger'">{{file.file_name_re || file.file_name_saved || '&times;'}}</td>
+                      <template v-if="!fileSelect.previewRegex">
+                        <td v-if="file.dir">{{ file.include_items }}项</td>
+                        <td v-else>{{file.size | size}}</td>
+                        <td>{{file.updated_at | ts2date}}</td>
+                        <td v-if="!fileSelect.selectShare"><a class="cursor-pointer text-muted" @click.stop.prevent="deleteFile(file.fid, file.file_name, file.dir)">删除</a></td>
+                      </template>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer" v-if="fileSelect.selectDir && !fileSelect.previewRegex">
+            <span>{{ fileSelect.selectShare ? '转存：' : '保存到：' }}</span>
+            <button type="button" class="btn btn-primary btn-sm" @click="selectCurrentFolder()">当前文件夹</button>
+            <button type="button" class="btn btn-primary btn-sm" v-if="!fileSelect.selectShare" @click="selectCurrentFolder(true)">当前文件夹<span class="badge badge-light" v-if="fileSelect.index<this.formData.tasklist.length">/{{ formData.tasklist[fileSelect.index].taskname }}</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div class="toast-container">
+      <div v-for="toast in toasts" :key="toast.id" class="toast show shadow-sm" :class="toast.type" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-body d-flex align-items-center">
+          <i class="bi mr-2" :class="getToastIcon(toast.type)"></i>
+          <span>{{ toast.message }}</span>
+          <button type="button" class="ml-auto close" @click="removeToast(toast.id)" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <script>
+    var app = new Vue({
+      el: '#app',
+      data: {
+        version: "[[ version ]]",
+        plugin_flags: "[[ plugin_flags ]]",
+        // 内部更新状态
+        upd: {
+          latest: "", can_update: false, busy: false, checking: false,
+          message: "", detail: "", error: "", notes: "", repo: ""
+        },
+        weekdays: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+        cookieVisible: [],   // 每条 Cookie 的明文/密文显示状态，默认隐藏
+        formData: {
+          cookie: [],
+          push_config: {},
+          media_servers: {},
+          tasklist: [],
+          magic_regex: {},
+          source: {
+            net: {
+              enable: ""
+            },
+            cloudsaver: {
+              server: "",
+              username: "",
+              password: "",
+              token: ""
+            },
+            pansou: {
+              server: ""
+            },
+            auto_repair: {
+              enable: false
+            }
+          },
+        },
+        toasts: [],
+        newTask: {
+          taskname: "",
+          shareurl: "",
+          savepath: "/",
+          pattern: "",
+          replace: "",
+          enddate: "",
+          addition: {},
+          ignore_extension: false,
+          runweek: [1, 2, 3, 4, 5, 6, 7]
+        },
+        run_log: "",
+        taskDirs: [""],
+        taskDirSelected: "",
+        taskNameFilter: "",
+        modalLoading: false,
+        smart_param: {
+          index: null,
+          savepath: "",
+          origin_savepath: "",
+          taskSuggestions: {},
+          showSuggestions: false,
+          isSearching: false,
+          isVerifying: false,
+          searchTimer: null,
+        },
+        activeTab: 'tasklist',
+        configModified: false,
+        fileSelect: {
+          index: null,
+          share: {},
+          shareurl: "",
+          stoken: "",
+          fileList: [],
+          paths: [],
+          selectDir: true,
+          selectShare: true,
+          switchShare: false,
+          previewRegex: false,
+          sortBy: "updated_at",
+          sortOrder: "desc"
+        },
+      },
+      filters: {
+        ts2date: function (value) {
+          const date = new Date(value);
+          return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+        },
+        size: function (value) {
+          if (!value) return "";
+          const unitArr = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+          const srcsize = parseFloat(value);
+          const index = srcsize ? Math.floor(Math.log(srcsize) / Math.log(1024)) : 0;
+          const size = (srcsize / Math.pow(1024, index)).toFixed(1).replace(/\.?0+$/, "");
+          return size + unitArr[index];
+        }
+      },
+      watch: {
+        formData: {
+          handler(newVal, oldVal) {
+            this.configModified = true;
+          },
+          deep: true
+        }
+      },
+      mounted() {
+        this.fetchData();
+        this.checkUpdate(true);
+        $('[data-toggle="tooltip"]').tooltip();
+        document.addEventListener('keydown', this.handleKeyDown);
+        document.addEventListener('click', (e) => {
+          if (!e.target.closest('.input-group')) {
+            this.smart_param.showSuggestions = false;
+          }
+        });
+        window.addEventListener('beforeunload', this.handleBeforeUnload);
+      },
+      beforeDestroy() {
+        window.removeEventListener('beforeunload', this.handleBeforeUnload);
+      },
+      methods: {
+        // ---------------- 内部更新 ----------------
+        checkUpdate(silent) {
+          this.upd.checking = true;
+          this.upd.error = "";
+          if (!silent) this.upd.message = "";
+          axios.get('/api/update/check')
+            .then(res => {
+              const d = res.data || {};
+              if (!d.success) { this.upd.error = d.message || '检查更新失败'; return; }
+              const info = d.data || {};
+              this.upd.latest = info.latest || "";
+              this.upd.can_update = !!info.can_update;
+              this.upd.notes = info.notes || "";
+              this.upd.repo = info.repo || "";
+              this.upd.message = `当前 ${info.current} · 源 ${info.repo}` + (info.source ? `（${info.source}）` : "");
+            })
+            .catch(e => { this.upd.error = '检查更新失败：' + (e.message || e); })
+            .finally(() => { this.upd.checking = false; });
+        },
+        applyUpdate() {
+          if (this.upd.busy) return;
+          if (!confirm(`确认更新到 ${this.upd.latest}？\n\n只替换程序代码，不动配置；完成后服务会自动重启。`)) return;
+          this.upd.busy = true;
+          this.upd.error = "";
+          this.upd.detail = "";
+          this.upd.message = "正在下载并替换代码…";
+          axios.post('/api/update/apply', {})
+            .then(res => {
+              const d = res.data || {};
+              if (!d.success && (d.message || '').indexOf('本地定制') >= 0) {
+                if (confirm(d.message + '\n\n仍要强制覆盖吗？（本地定制功能会丢失）')) {
+                  return axios.post('/api/update/apply', { force: true })
+                    .then(r2 => this.handleUpdateResult(r2.data || {}));
+                }
+                this.upd.error = d.message;
+                this.upd.message = "";
+                return;
+              }
+              this.handleUpdateResult(d);
+            })
+            .catch(e => { this.upd.error = '更新失败：' + (e.message || e); })
+            .finally(() => { this.upd.busy = false; });
+        },
+        handleUpdateResult(d) {
+          if (!d.success) { this.upd.error = d.message || '更新失败'; this.upd.message = ""; return; }
+          this.upd.can_update = false;
+          this.upd.message = d.message || '更新完成';
+          this.upd.detail = d.restart_required ? '服务即将自动重启，稍后刷新页面' : '';
+          if (d.restart_required) setTimeout(() => window.location.reload(), 9000);
+        },
+        changeTab(tab) {
+          this.activeTab = tab;
+          if (window.innerWidth <= 768) {
+            $('#sidebarMenu').collapse('toggle')
+          }
+        },
+        fetchData() {
+          axios.get('/data')
+            .then(response => {
+              config_data = response.data.data
+              // cookie兼容
+              if (typeof config_data.cookie === 'string')
+                config_data.cookie = [config_data.cookie];
+              // 添加星期预设
+              config_data.tasklist = config_data.tasklist.map(task => {
+                if (!task.hasOwnProperty('runweek')) {
+                  task.runweek = [1, 2, 3, 4, 5, 6, 7];
+                }
+                return task;
+              });
+              // 获取所有任务父目录
+              config_data.tasklist.forEach(item => {
+                parentDir = this.getParentDirectory(item.savepath)
+                if (!this.taskDirs.includes(parentDir))
+                  this.taskDirs.push(parentDir);
+              });
+              this.newTask.addition = config_data.task_plugins_config_default;
+              // 确保source配置存在
+              if (!config_data.source) {
+                config_data.source = {};
+              }
+              if (!config_data.source.cloudsaver) {
+                config_data.source.cloudsaver = {
+                  server: "",
+                  username: "",
+                  password: "",
+                  token: ""
+                };
+              }
+              if (!config_data.source.pansou) {
+                config_data.source.pansou = {
+                  server: ""
+                };
+              }
+              if (!config_data.source.net) {
+                config_data.source.net = {
+                  enable: ""
+                };
+              }
+              if (!config_data.source.auto_repair) {
+                config_data.source.auto_repair = {
+                  enable: false
+                };
+              }
+              this.formData = config_data;
+              // 已保存的 Cookie 默认全部脱敏隐藏
+              this.cookieVisible = (config_data.cookie || []).map(() => false);
+              setTimeout(() => {
+                this.configModified = false;
+              }, 100);
+            })
+            .catch(error => {
+              console.error('Error fetching data:', error);
+            });
+        },
+        handleKeyDown(event) {
+          if (event.ctrlKey || event.metaKey) {
+            if (event.keyCode === 83 || event.key === 's') {
+              event.preventDefault();
+              this.saveConfig();
+            } else if (event.keyCode === 82 || event.key === 'r') {
+              event.preventDefault();
+              this.runScriptNow();
+            }
+          }
+        },
+        handleBeforeUnload(e) {
+          if (this.configModified) {
+            e.preventDefault();
+            e.returnValue = '配置已修改但未保存，确定要离开吗？';
+            return e.returnValue;
+          }
+        },
+        saveConfig() {
+          axios.post('/update', this.formData)
+            .then(response => {
+              if (response.data.success) {
+                this.configModified = false;
+                this.showToast(response.data.message, 'success');
+              } else {
+                this.showToast(response.data.message, 'error');
+              }
+              console.log('Config saved result:', response.data);
+            })
+            .catch(error => {
+              console.error('Error saving config:', error);
+            });
+        },
+        addCookie() {
+          this.formData.cookie.push("");
+          this.cookieVisible.push(false);
+        },
+        removeCookie(index) {
+          if (this.formData.cookie[index] == "" || confirm("确认删除吗？")) {
+            this.formData.cookie.splice(index, 1);
+            this.cookieVisible.splice(index, 1);
+          }
+        },
+        toggleCookie(index) {
+          // 切换单条 Cookie 的明文/密文显示
+          this.$set(this.cookieVisible, index, !this.cookieVisible[index]);
+        },
+        testPush() {
+          this.runScriptNow(1, true);
+        },
+        addPush() {
+          key = prompt("增加的键名", "");
+          if (key != "" && key != null)
+            this.$set(this.formData.push_config, key, "");
+        },
+        removePush(key) {
+          if (confirm("确认删除吗？"))
+            this.$delete(this.formData.push_config, key);
+        },
+        addTask() {
+          newTask = { ...this.newTask }
+          newTask.taskname = this.taskNameFilter;
+          if (this.formData.tasklist.length > 0) {
+            lastTask = this.formData.tasklist[this.formData.tasklist.length - 1];
+            if (this.taskDirSelected) {
+              newTask.savepath = this.taskDirSelected + '/TASKNAME';
+            } else {
+              if (newTask.taskname) {
+                newTask.savepath = lastTask.savepath.replace(lastTask.taskname, newTask.taskname);
+              } else {
+                newTask.savepath = lastTask.taskname ? lastTask.savepath.replace(lastTask.taskname, 'TASKNAME') : lastTask.savepath;
+              }
+            }
+          }
+          this.formData.tasklist.push(newTask);
+          // 滚到最下
+          setTimeout(() => {
+            $('#collapse_' + (this.formData.tasklist.length - 1)).collapse('show').on('shown.bs.collapse', () => {
+              this.scrollToX();
+            });
+          }, 1);
+        },
+        focusTaskname(index, task) {
+          this.smart_param.index = index
+          this.smart_param.origin_savepath = task.savepath
+          regex = new RegExp(`/${task.taskname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/|$)`)
+          if (task.savepath.includes('TASKNAME')) {
+            this.smart_param.savepath = task.savepath;
+          } else if (task.savepath.match(regex)) {
+            this.smart_param.savepath = task.savepath.replace(task.taskname, 'TASKNAME');
+          } else {
+            this.smart_param.savepath = undefined;
+          }
+        },
+        changeTaskname(index, task) {
+          if (this.smart_param.searchTimer) {
+            clearTimeout(this.smart_param.searchTimer);
+          }
+          this.smart_param.searchTimer = setTimeout(() => {
+            this.searchSuggestions(index, task.taskname, 0);
+          }, 1000);
+          if (this.smart_param.savepath)
+            task.savepath = this.smart_param.savepath.replace('TASKNAME', task.taskname);
+        },
+        removeTask(index) {
+          if (confirm("确认删除任务 [#" + (index + 1) + ": " + this.formData.tasklist[index].taskname + "] 吗？"))
+            this.formData.tasklist.splice(index, 1);
+        },
+        changeShareurl(task) {
+          if (!task.shareurl)
+            return;
+          this.$set(task, "shareurl_ban", undefined);
+          // 从URL中提取任务名
+          try {
+            const matches = decodeURIComponent(task.shareurl).match(/\/(\w{32})-([^\/]+)$/);
+            if (matches) {
+              task.taskname = task.taskname == "" ? matches[2] : task.taskname;
+              task.savepath = task.savepath.replace(/TASKNAME/g, matches[2]);
+            }
+          } catch (e) {
+            console.error("Error decodeURIComponent:", e);
+          }
+          // 从分享中提取任务名
+          axios.post('/get_share_detail', {
+            shareurl: task.shareurl
+          }).then(response => {
+            share_detail = response.data.data
+            if (!response.data.success) {
+              if (share_detail.error.includes("提取码")) {
+                const passcode = prompt("检查失败[" + share_detail.error + "]，请输入提取码：");
+                if (passcode != null) {
+                  task.shareurl = task.shareurl.replace(/pan.quark.cn\/s\/(\w+)(\?pwd=\w*)*/, `pan.quark.cn/s/$1?pwd=${passcode}`);
+                  this.changeShareurl(task);
+                  return;
+                }
+              }
+              this.$set(task, "shareurl_ban", share_detail.error);
+            } else {
+              task.taskname = task.taskname == "" ? share_detail.share.title : task.taskname;
+              task.savepath = task.savepath.replace(/TASKNAME/g, share_detail.share.title);
+              this.$set(task, "shareurl_ban", undefined);
+            }
+          }).catch(error => {
+            console.error('Error get_share_detail:', error);
+          });
+        },
+        repairShareurl(index, task) {
+          // 一键修复失效链接：展开任务，按任务名搜索可用分享链接供用户确认替换
+          const taskname = (task.taskname || '').replace(/\((19|20)\d{2}\)/g, '').trim();
+          if (taskname.length < 2) {
+            this.showToast('任务名过短，无法自动搜索，请手动修改任务名称或分享链接', 'warning');
+            return;
+          }
+          $('#collapse_' + index).collapse('show');
+          this.smart_param.showSuggestions = true;
+          this.focusTaskname(index, task);
+          this.searchSuggestions(index, task.taskname);
+          setTimeout(() => {
+            document.getElementById('collapse_' + index).scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 300);
+        },
+        clearData(target) {
+          this[target] = "";
+        },
+        async runScriptNow(task_index = null, test = false) {
+          body = {};
+          if (test) {
+            body = {
+              "quark_test": true,
+              "cookie": this.formData.cookie,
+              "push_config": this.formData.push_config
+            };
+          } else if (task_index != null) {
+            task = { ...this.formData.tasklist[task_index] };
+            delete task.runweek;
+            delete task.enddate;
+            body = {
+              "tasklist": [task]
+            };
+          } else if (this.configModified) {
+            if (!confirm('配置已修改但未保存，是否继续运行？')) {
+              return;
+            }
+          }
+          $('#logModal').modal('toggle');
+          this.modalLoading = true;
+          this.run_log = '';
+          try {
+            // 1. 发送 POST 请求
+            const response = await fetch(`/run_script_now`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(body)
+            });
+            if (!response.ok) {
+              throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            // 2. 处理 SSE 流
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let partialData = '';
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                break;
+              }
+              partialData += decoder.decode(value);
+              const lines = partialData.split('\n').filter(line => line.trim() !== '');
+              for (const line of lines) {
+                if (line.startsWith('data:')) {
+                  const eventData = line.substring(5).trim();
+                  if (eventData === '[DONE]') {
+                    this.modalLoading = false;
+                    if (task_index == null) {
+                      this.fetchData();
+                    }
+                    break;
+                  }
+                  this.run_log += eventData + '\n';
+                  // 在更新 run_log 后将滚动条滚动到底部
+                  this.$nextTick(() => {
+                    const modalBody = document.querySelector('.modal-body');
+                    modalBody.scrollTop = modalBody.scrollHeight;
+                  });
+                } else {
+                  console.warn('Unexpected line:', line);
+                }
+              }
+              partialData = '';
+            }
+          } catch (error) {
+            this.modalLoading = false;
+            console.error('Error:', error);
+          }
+        },
+        getParentDirectory(path) {
+          parentDir = path.substring(0, path.lastIndexOf('/'))
+          if (parentDir == "")
+            parentDir = "/"
+          return parentDir;
+        },
+        scrollToX(top = undefined) {
+          if (top == undefined)
+            top = document.documentElement.scrollHeight
+          window.scrollTo({
+            top: top,
+            behavior: "smooth"
+          });
+        },
+        getAvailablePlugins(plugins) {
+          availablePlugins = {};
+          const pluginsFlagsArray = this.plugin_flags.split(',');
+          for (const pluginName in plugins) {
+            if (!pluginsFlagsArray.includes(`-${pluginName}`)) {
+              availablePlugins[pluginName] = plugins[pluginName];
+            }
+          }
+          return availablePlugins;
+        },
+        toggleAllWeekdays(task) {
+          if (task.runweek.length === 7) {
+            task.runweek = [];
+          } else {
+            task.runweek = [1, 2, 3, 4, 5, 6, 7];
+          }
+        },
+        searchSuggestions(index, taskname, deep = 1) {
+          taskname = taskname.replace(/\((19|20)\d{2}\)/g, '').trim();
+          if (taskname.length < 2) {
+            console.log(`任务名[${taskname}]过短${taskname.length} 不进行搜索`);
+            return;
+          }
+          this.smart_param.isSearching = true;
+          this.smart_param.taskSuggestions = {};
+          this.smart_param.index = index;
+          try {
+            axios.get('/task_suggestions', {
+              params: {
+                q: taskname,
+                d: deep
+              }
+            }).then(response => {
+              this.smart_param.taskSuggestions = response.data;
+              this.smart_param.showSuggestions = true;
+              this.smart_param.isSearching = false;
+              const data = response.data.data;
+              if (data && data.length > 0) {
+                this.verifyShareLinks(data);
+              }
+            }).catch(error => {
+              console.error('Error fetching suggestions:', error);
+            }).finally(() => {
+              this.smart_param.isSearching = false;
+            });
+          } catch (e) {
+            this.smart_param.taskSuggestions = {
+              error: "网络异常"
+            };
+          }
+        },
+        verifyShareLinks(data, concurrency = 10) {
+          this.smart_param.isVerifying = true;
+          let idx = 0;
+          const next = () => {
+            // 当发起下一次搜索时放弃本批验证
+            if (this.smart_param.isSearching || idx >= data.length) {
+              this.smart_param.isVerifying = false;
+              return;
+            }
+            const item = data[idx++];
+            // 只验证未知链接
+            if (item.verify !== undefined) { next(); return; }
+            axios.post('/get_share_detail', { shareurl: item.shareurl })
+              .then(res => {
+                if (this.smart_param.isSearching) return;
+                this.$set(item, 'verify', res.data.success);
+              }).catch(() => {
+                if (this.smart_param.isSearching) return;
+                this.$set(item, 'verify', false);
+              }).finally(() => {
+                if (this.smart_param.isSearching) {
+                  this.smart_param.isVerifying = false;
+                  return;
+                }
+                next();
+              });
+          };
+          const running = Math.min(concurrency, data.length);
+          for (let i = 0; i < running; i++) next();
+        },
+        selectSuggestion(index, suggestion) {
+          this.smart_param.showSuggestions = false;
+          this.fileSelect.selectDir = true;
+          this.fileSelect.switchShare = true;
+          this.fileSelect.previewRegex = false;
+          this.fileSelect.share = suggestion;
+          this.showShareSelect(index, suggestion.shareurl);
+        },
+        addMagicRegex() {
+          const newKey = `$MAGIC_${Object.keys(this.formData.magic_regex).length + 1}`;
+          this.$set(this.formData.magic_regex, newKey, { pattern: '', replace: '' });
+        },
+        updateMagicRegexKey(oldKey, newKey) {
+          if (oldKey !== newKey) {
+            if (this.formData.magic_regex[newKey]) {
+              this.showToast(`魔法名 [${newKey}] 已存在，请使用其他名称`, 'warning');
+              return;
+            }
+            this.$set(this.formData.magic_regex, newKey, this.formData.magic_regex[oldKey]);
+            this.$delete(this.formData.magic_regex, oldKey);
+          }
+        },
+        removeMagicRegex(key) {
+          if (confirm(`确认删除魔法匹配规则 [${key}] 吗？`)) {
+            this.$delete(this.formData.magic_regex, key);
+          }
+        },
+        deleteFile(fid, fname, isDir) {
+          if (fid != "" && confirm(`确认删除${isDir ? '目录' : '文件'} [${fname}] 吗？`))
+            axios.post('/delete_file', {
+              fid: fid
+            }).then(response => {
+              if (response.data.code == 0) {
+                this.fileSelect.fileList = this.fileSelect.fileList.filter(item => item.fid != fid);
+              } else {
+                this.showToast('删除失败：' + response.data.message, 'error');
+              }
+            }).catch(error => {
+              console.error('Error /delete_file:', error);
+            });
+        },
+        getSavepathDetail(params = 0) {
+          if (params.includes('/')) {
+            params = { path: params }
+          } else {
+            params = { fid: params }
+          }
+          this.modalLoading = true;
+          axios.get('/get_savepath_detail', {
+            params: params
+          }).then(response => {
+            this.fileSelect.fileList = response.data.data.list;
+            this.sortFileList(this.fileSelect.sortBy, this.fileSelect.sortOrder);
+            if (response.data.data.paths?.length > 0) {
+              this.fileSelect.paths = response.data.data.paths
+            }
+            this.modalLoading = false;
+          }).catch(error => {
+            console.error('Error /get_savepath_detail:', error);
+            this.fileSelect.error = "获取文件夹列表失败";
+            this.modalLoading = false;
+          });
+        },
+        showSavepathSelect(index) {
+          this.fileSelect.selectShare = false;
+          this.fileSelect.selectDir = true;
+          this.fileSelect.switchShare = false;
+          this.fileSelect.previewRegex = false;
+          this.fileSelect.error = undefined;
+          this.fileSelect.fileList = [];
+          this.fileSelect.paths = [];
+          this.fileSelect.index = index;
+          $('#fileSelectModal').modal('toggle');
+          this.formData.tasklist[index].savepath = this.formData.tasklist[index].savepath.replace(/\/+/g, "/");
+          this.getSavepathDetail(this.formData.tasklist[index].savepath);
+        },
+        getShareDetail() {
+          this.modalLoading = true;
+          axios.post('/get_share_detail', {
+            shareurl: this.fileSelect.shareurl,
+            stoken: this.fileSelect.stoken,
+            task: this.formData.tasklist[this.fileSelect.index],
+            magic_regex: this.formData.magic_regex,
+          }).then(response => {
+            if (response.data.success) {
+              this.fileSelect.fileList = response.data.data.list;
+              this.sortFileList(this.fileSelect.sortBy, this.fileSelect.sortOrder);
+              this.fileSelect.paths = response.data.data.paths;
+              this.fileSelect.stoken = response.data.data.stoken;
+            } else {
+              this.fileSelect.error = response.data.data.error
+            }
+            this.modalLoading = false;
+          }).catch(error => {
+            console.error('Error getting folders:', error);
+            this.fileSelect.error = "获取文件夹列表失败";
+            this.modalLoading = false;
+          });
+        },
+        showShareSelect(index, shareurl = null) {
+          this.fileSelect.selectShare = true;
+          this.fileSelect.fileList = [];
+          this.fileSelect.paths = [];
+          this.fileSelect.error = undefined;
+          // 如果分享链接发生变化，则重置 stoken
+          const newShareurl = shareurl || this.formData.tasklist[index].shareurl
+          if (this.getShareurl(this.fileSelect.shareurl) != this.getShareurl(newShareurl)) {
+            this.fileSelect.stoken = "";
+          }
+          this.fileSelect.shareurl = newShareurl;
+          this.fileSelect.index = index;
+          $('#fileSelectModal').modal('toggle');
+          this.getShareDetail();
+        },
+        switchShare(index) {
+          const data = this.smart_param.taskSuggestions.data;
+          let currentIndex = data.indexOf(this.fileSelect.share);
+          let nextIndex = currentIndex + index;
+          // 跳过已验证失败的分享链接
+          while (nextIndex >= 0 && nextIndex < data.length) {
+            if (data[nextIndex].verify !== false) break;
+            nextIndex += index;
+          }
+          if (nextIndex < 0) {
+            this.showToast("没有上一个啦", "info");
+          } else if (nextIndex >= data.length) {
+            this.showToast("没有下一个啦", "info");
+          } else {
+            this.fileSelect.error = "";
+            this.fileSelect.stoken = "";
+            this.fileSelect.share = data[nextIndex];
+            this.fileSelect.shareurl = data[nextIndex].shareurl;
+            this.fileSelect.paths = [];
+            this.fileSelect.fileList = [];
+            this.getShareDetail();
+          }
+        },
+        navigateTo(fid, name) {
+          dir = { fid: fid, name: name }
+          if (this.fileSelect.selectShare) {
+            this.fileSelect.shareurl = this.getShareurl(this.fileSelect.shareurl, dir);
+            this.getShareDetail();
+          } else {
+            if (fid == "0") {
+              this.fileSelect.paths = []
+            } else {
+              index = this.fileSelect.paths.findIndex(item => item.fid === fid);
+              if (index !== -1) {
+                this.fileSelect.paths = this.fileSelect.paths.slice(0, index + 1)
+              } else {
+                this.fileSelect.paths.push({ fid: fid, name: name })
+              }
+            }
+            this.getSavepathDetail(fid);
+          }
+        },
+        selectCurrentFolder(addTaskname = false) {
+          if (this.fileSelect.selectShare) {
+            this.formData.tasklist[this.fileSelect.index].shareurl_ban = undefined;
+            this.formData.tasklist[this.fileSelect.index].shareurl = this.fileSelect.shareurl;
+          } else {
+            this.formData.tasklist[this.fileSelect.index].savepath = "/" + this.fileSelect.paths.map(item => item.name).join("/");
+            if (addTaskname) {
+              this.formData.tasklist[this.fileSelect.index].savepath += "/" + this.formData.tasklist[this.fileSelect.index].taskname
+            }
+          }
+          $('#fileSelectModal').modal('hide')
+        },
+        selectStartFid(fid) {
+          Vue.set(this.formData.tasklist[this.fileSelect.index], 'startfid', fid);
+          $('#fileSelectModal').modal('hide')
+        },
+        getShareurl(shareurl, dir = {}) {
+          if (dir == {} || dir.fid == 0) {
+            shareurl = shareurl.match(`.*s/[a-z0-9]+(\\?pwd=[^#]+)?`)[0]
+          } else if (shareurl.includes(dir.fid)) {
+            shareurl = shareurl.match(`.*/${dir.fid}[^/]*`)[0]
+          } else if (shareurl.includes('#/list/share')) {
+            shareurl = `${shareurl.split('#')[0]}#/list/share/${dir.fid}`
+          } else {
+            shareurl = `${shareurl.split('#')[0]}#/list/share/${dir.fid}`
+          }
+          return shareurl;
+        },
+        sortFileList(column, order) {
+          if (this.fileSelect.sortBy === column && !order) {
+            this.fileSelect.sortOrder = this.fileSelect.sortOrder === "asc" ? "desc" : "asc";
+          } else {
+            this.fileSelect.sortBy = column;
+            this.fileSelect.sortOrder = order || "asc";
+          }
+
+          this.fileSelect.fileList.sort((a, b) => {
+            let valA = a[this.fileSelect.sortBy];
+            let valB = b[this.fileSelect.sortBy];
+
+            if (typeof valA === "string") valA = valA.toLowerCase();
+            if (typeof valB === "string") valB = valB.toLowerCase();
+
+            if (valA < valB) return this.fileSelect.sortOrder === "asc" ? -1 : 1;
+            if (valA > valB) return this.fileSelect.sortOrder === "asc" ? 1 : -1;
+            return 0;
+          });
+        },
+        inputRawMagicRegex(task) {
+          const item = this.formData.magic_regex[task.pattern];
+          if (item) {
+            task.pattern = item.pattern;
+            task.replace = item.replace;
+          }
+        },
+        copyText(text, callback = () => { }) {
+          if (!text) {
+            console.error('No text to copy');
+            return;
+          }
+          if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text);
+          } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.top = '0';
+            textarea.style.left = '0';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            textarea.setSelectionRange(0, 99999);
+            document.execCommand("copy");
+            document.body.removeChild(textarea);
+          }
+          callback()
+        },
+        copyTaskToClipboard(index) {
+          const task = { ...this.formData.tasklist[index] };
+          delete task.addition;
+          const _this = this;
+          this.copyText(JSON.stringify(task), function () {
+            _this.showToast("任务参数已复制到剪贴板", "success");
+          });
+        },
+        async addTaskForClipboard() {
+          text = null
+          try {
+            text = await navigator.clipboard.readText();
+          } catch (error) {
+            text = prompt("当前环境不支持自动读取粘贴板，请手动粘贴任务参数", "");
+          }
+          if (text) {
+            try {
+              let task = JSON.parse(text);
+              task = { ...this.newTask, ...task };
+              this.formData.tasklist.push(task);
+              this.showToast("剪贴板参数已成功导入任务", "success");
+              // 滚到最下
+              setTimeout(() => {
+                $('#collapse_' + (this.formData.tasklist.length - 1)).collapse('show').on('shown.bs.collapse', () => {
+                  this.scrollToX();
+                });
+              }, 1);
+            } catch (error) {
+              this.showToast("解析剪贴板内容失败", "error");
+            }
+          }
+        },
+        showToast(message, type = 'info', duration = 3000) {
+          const id = Date.now();
+          this.toasts.push({ id, message, type });
+          setTimeout(() => {
+            this.removeToast(id);
+          }, duration);
+        },
+        removeToast(id) {
+          this.toasts = this.toasts.filter(t => t.id !== id);
+        },
+        getToastIcon(type) {
+          switch (type) {
+            case 'success': return 'bi-check-circle-fill text-success';
+            case 'error': return 'bi-exclamation-circle-fill text-danger';
+            case 'warning': return 'bi-exclamation-triangle-fill text-warning';
+            default: return 'bi-info-circle-fill text-info';
+          }
+        },
+      }
+    });
+  </script>
+</body>
+
+</html>
