@@ -13,3 +13,6 @@ venv/
 # 本地运行数据（仅仓库根，别把 fnos/config 也忽略掉）
 /config/
 build.json
+
+# musl 编译的二进制插件，fnOS(glibc) 不可用
+plugins/*.so

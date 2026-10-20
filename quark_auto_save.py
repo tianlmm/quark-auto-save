@@ -120,6 +120,8 @@ class Config:
             for f in os.listdir(plugins_dir)
             for ext in module_ext
             if f.endswith(ext)
+            # 跳过 fnv_refresh_v2.x86_64.so 这类带架构后缀的二进制模块
+            and "." not in f.replace(ext, "")
         ]
         # 调整模块优先级
         priority_path = os.path.join(plugins_dir, "_priority.json")
@@ -150,7 +152,7 @@ class Config:
                 if hasattr(plugin, "default_task_config"):
                     task_plugins_config[module_name] = plugin.default_task_config
             except (ImportError, AttributeError) as e:
-                print(f"载入模块 {module_name} 失败: {e}")
+                print(f"插件 {module_name} 不可用（已跳过）: {e}")
         return plugins_available, plugins_config, task_plugins_config
 
     def breaking_change_update(config_data):

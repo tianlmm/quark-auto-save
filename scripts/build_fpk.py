@@ -70,6 +70,9 @@ def copytree(src, dst, base=None):
             continue
         if name in SKIP_FILES or name.endswith(SKIP_SUFFIX):
             continue
+        # fnOS 是 glibc，仓库里自带的 *.so 是 alpine(musl) 编译的，加载必失败，不打包
+        if name.endswith(".so"):
+            continue
         shutil.copy2(s, d)
         mode = 0o755 if name.endswith(".sh") else 0o644
         os.chmod(d, mode)
