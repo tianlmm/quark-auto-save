@@ -63,10 +63,23 @@ jobs:
           set -e
           ls -l dist
           for f in dist/*.fpk; do
-            tar -tzf "$f" | grep -qx 'manifest.checksum' || { echo "::error::$f 缺 manifest.checksum"; exit 1; }
-            tar -tzf "$f" | grep -qx 'app.tgz'          || { echo "::error::$f 缺 app.tgz"; exit 1; }
+            echo "== $f"
+            # 外层只应有 app.tgz + cmd/ + config/ + wizard/ + ICON + manifest
+            tar -tzf "$f" | grep -qx 'manifest' || { echo "::error::$f 缺 manifest"; exit 1; }
+            tar -tzf "$f" | grep -qx 'app.tgz'  || { echo "::error::$f 缺 app.tgz"; exit 1; }
+            tar -tzf "$f" | grep -qx 'cmd/main' || { echo "::error::$f 缺 cmd/main"; exit 1; }
+
+            # fnOS 读的是 manifest 里的 checksum 字段，必须等于 app.tgz 的 md5
+            cs="$(tar -xzOf "$f" manifest | awk -F= '/^checksum/{gsub(/[ \t\r]/,"",$2);print $2}')"
+            [ -n "$cs" ] || { echo "::error::$f 的 manifest 缺 checksum 字段（安装会报数据包不完整）"; exit 1; }
+            got="$(tar -xzOf "$f" app.tgz | md5sum | awk '{print $1}')"
+            [ "$cs" = "$got" ] || { echo "::error::$f checksum 不匹配：manifest=$cs app.tgz=$got"; exit 1; }
+            echo "   checksum ok: $cs"
+
             tar -xzOf "$f" app.tgz | tar -tzf - | grep -qx 'app/run.py' \
               || { echo "::error::$f 内 app.tgz 缺 app/run.py"; exit 1; }
+            tar -xzOf "$f" app.tgz | tar -tzf - | grep -qx 'ui/config' \
+              || { echo "::error::$f 内缺 ui/config（桌面入口）"; exit 1; }
           done
 
       - uses: actions/upload-artifact@v4
