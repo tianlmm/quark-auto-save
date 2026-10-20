@@ -16,11 +16,36 @@ is_running() {
   [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null
 }
 
+# 从 env.sh 取端口（安装向导里可能改过）
+CONF_PORT=""
+if [ -f "${VAR_DIR}/env.sh" ]; then
+  CONF_PORT="$(. "${VAR_DIR}/env.sh" >/dev/null 2>&1; echo "${PORT:-}")"
+fi
+SERVICE_PORT="${CONF_PORT:-${TRIM_SERVICE_PORT:-5005}}"
+
+port_busy() {
+  local p="$1"
+  if command -v ss >/dev/null 2>&1; then
+    [ -n "$(ss -ltnH 2>/dev/null | awk -v p=":${p}$" '$4 ~ p')" ]
+  elif command -v netstat >/dev/null 2>&1; then
+    netstat -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${p}$"
+  else
+    return 1
+  fi
+}
+
 case "${1:-}" in
   start)
     if is_running; then exit 0; fi
     if [ ! -x "${APP_DIR}/service.sh" ]; then
       echo "FATAL: 缺少 ${APP_DIR}/service.sh" | tee -a "${LOG}" >&2
+      exit 1
+    fi
+    # 端口被占用时不要硬启，直接把冲突写进日志与界面
+    if port_busy "${SERVICE_PORT}"; then
+      MSG="端口 ${SERVICE_PORT} 已被占用，应用无法启动。请在「应用设置」里改端口，或释放该端口后重试。"
+      echo "FATAL: ${MSG}" | tee -a "${LOG}" >&2
+      [ -n "${TRIM_TEMP_LOGFILE:-}" ] && echo "${MSG}" > "${TRIM_TEMP_LOGFILE}"
       exit 1
     fi
     # setsid：让 supervisor 成为进程组组长，stop 时整组回收，避免 python 变孤儿占端口
@@ -32,7 +57,7 @@ case "${1:-}" in
     echo $! > "${PID_FILE}"
     sleep 3
     if is_running; then
-      echo "quark-auto-save started (port ${TRIM_SERVICE_PORT:-5005})"
+      echo "quark-auto-save started (port ${SERVICE_PORT})"
       exit 0
     fi
     echo "quark-auto-save start failed, 最近日志：" >&2
@@ -56,7 +81,9 @@ case "${1:-}" in
     exit 0
     ;;
   status)
-    is_running && exit 0 || exit 3
+    is_running || exit 3
+    # 进程活着但端口没监听，视为未就绪
+    port_busy "${SERVICE_PORT}" && exit 0 || exit 3
     ;;
   *)
     exit 1

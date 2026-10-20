@@ -1,5 +1,5 @@
 #!/bin/bash
-# config_callback — 应用设置保存后重写环境文件与更新配置
+# config_callback — 应用设置保存后：端口校验、环境文件、桌面入口、更新配置
 set -u
 APP_DIR="${TRIM_APPDEST:-/var/apps/quark-auto-save/target}"
 VAR_DIR="${TRIM_PKGVAR:-/var/apps/quark-auto-save/var}"
@@ -8,16 +8,78 @@ mkdir -p "${VAR_DIR}/config" 2>/dev/null || true
 exec >>"${LOG}" 2>&1
 echo "===== config_callback $(date '+%F %T') ====="
 
+fail() {
+  echo "FAIL: $1"
+  [ -n "${TRIM_TEMP_LOGFILE:-}" ] && echo "$1" > "${TRIM_TEMP_LOGFILE}"
+  exit 1
+}
+
+# ---------- 1. 端口 ----------
+PORT="${wizard_port:-}"
+if [ -z "${PORT}" ]; then
+  # 未提供则沿用当前值
+  PORT="$(. "${VAR_DIR}/env.sh" >/dev/null 2>&1; echo "${PORT:-5005}")"
+fi
+case "${PORT}" in
+  ''|*[!0-9]*) fail "端口「${PORT}」不是数字，请填写 1024-65535 之间的端口" ;;
+esac
+if [ "${PORT}" -lt 1024 ] || [ "${PORT}" -gt 65535 ]; then
+  fail "端口 ${PORT} 超出范围，请填写 1024-65535 之间的端口"
+fi
+
+port_busy() {
+  local p="$1"
+  if command -v ss >/dev/null 2>&1; then
+    [ -n "$(ss -ltnH 2>/dev/null | awk -v p=":${p}$" '$4 ~ p')" ]
+  elif command -v netstat >/dev/null 2>&1; then
+    netstat -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${p}$"
+  else
+    return 1
+  fi
+}
+
+# 允许“不变”：当前实例自己占着这个端口是正常的
+CUR_PORT="$(. "${VAR_DIR}/env.sh" >/dev/null 2>&1; echo "${PORT:-}")"
+if [ "${PORT}" != "${CUR_PORT}" ] && port_busy "${PORT}"; then
+  SUGGEST=""
+  i=$((PORT + 1)); LIMIT=$((PORT + 50))
+  while [ "${i}" -le "${LIMIT}" ] && [ "${i}" -le 65535 ]; do
+    if ! port_busy "${i}"; then SUGGEST="${i}"; break; fi
+    i=$((i + 1))
+  done
+  MSG="端口 ${PORT} 已被占用"
+  [ -n "${SUGGEST}" ] && MSG="${MSG}，建议改用 ${SUGGEST}"
+  fail "${MSG}"
+fi
+
+# ---------- 2. 登录开关 ----------
 AUTH="${wizard_webui_auth:-off}"
 case "${AUTH}" in on|off) ;; *) echo "非法 webui_auth=${AUTH}，回退 off"; AUTH="off" ;; esac
 
 cat > "${VAR_DIR}/env.sh" <<ENVEOF
 # 由 fnOS 应用设置生成
+PORT="${PORT}"
 WEBUI_AUTH="${AUTH}"
 ENVEOF
 chmod 640 "${VAR_DIR}/env.sh"
-echo "env.sh 已更新：WEBUI_AUTH=${AUTH}"
+echo "env.sh 已更新：PORT=${PORT} WEBUI_AUTH=${AUTH}"
 
+# ---------- 3. 桌面入口端口 ----------
+if [ -x "${APP_DIR}/venv/bin/python" ] && [ -f "${APP_DIR}/ui/config" ]; then
+  "${APP_DIR}/venv/bin/python" - "${APP_DIR}/ui/config" "${PORT}" <<'PYEOF' || echo "WARN: 改写 ui/config 失败"
+import json, sys
+path, port = sys.argv[1], str(sys.argv[2])
+with open(path, encoding="utf-8") as f:
+    conf = json.load(f)
+for entry in conf.get(".url", {}).values():
+    entry["port"] = port
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(conf, f, ensure_ascii=False, indent=2)
+print(f"ui/config port={port}")
+PYEOF
+fi
+
+# ---------- 4. 更新源 ----------
 REPO="${wizard_update_repo:-}"
 MODE="${wizard_update_mode:-}"
 if [ -n "${REPO}" ] || [ -n "${MODE}" ]; then
@@ -36,5 +98,6 @@ with open(path, "w", encoding="utf-8") as f:
 print(f"update.repo={upd.get('repo')} update.mode={upd.get('mode')}")
 PYEOF
 fi
+
 echo "提示：端口/登录开关变更后需停止再启动应用生效"
 exit 0

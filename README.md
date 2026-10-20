@@ -29,12 +29,26 @@ appcenter-cli install-fpk quark-auto-save_1.0.0_x86.fpk
 
 | 项 | 位置 |
 |---|---|
-| 端口 | `5005`（manifest.service_port） |
+| 端口 | 安装时可选（默认 `5005`），被占用会提示建议端口 |
 | 配置 | `/var/apps/quark-auto-save/var/config/quark_config.json` |
 | 日志 | `/var/apps/quark-auto-save/var/app.log`、`install.log` |
 | 生命周期 | `cmd/main start\|stop\|status`（未运行返回 3） |
 
 > 默认 `WEBUI_AUTH=off`：能访问 5005 就能改任务和 Cookie。只在内网暴露，或在安装向导里选 `on`。
+
+
+## 端口占用怎么处理
+
+安装向导第一步就问「服务端口」（默认 5005），`install_init` 会当场检查：
+
+- 端口被占用 → 安装**直接失败**，提示占用进程与建议端口（向上找 50 个），用户回上一步改端口重装；
+- 端口非法（非数字 / 不在 1024-65535）→ 同样失败并提示；
+- 端口可用 → 写入 `var/env.sh`，同时改写 `ui/config` 的 `port`，让桌面图标指向实际端口；
+- `manifest.checkport=false`：系统不再拿固定的 5005 去卡，改由我们自己的脚本判断。
+
+装好后想换端口：应用设置里改（`config_callback` 同样校验），然后**停止再启动**生效。
+
+启动时也会再查一次：端口被占则拒绝启动并把原因写进日志与界面，避免半启动状态。
 
 ## 内部更新
 

@@ -5,7 +5,23 @@
       {
         "type": "tips",
         "label": "",
-        "helpText": "安装约需 1-2 分钟（创建 venv 并安装 flask/apscheduler 等依赖）。\n\n• 服务端口固定 5005，安装后通过桌面图标或 http://NAS地址:5005 访问。\n• WebUI 登录校验默认关闭（与定制版一致）：任何能访问 5005 的人都能查看/修改夸克 Cookie 与任务，请只在内网使用，或把本项设为 on 后使用 admin/默认密码登录。\n• 配置与数据保存在应用数据目录，升级、重装不会清空。\n• 「内部更新」在 WebUI 侧边栏，可比对 GitHub 版本并就地更新代码（不动配置）。"
+        "helpText": "安装约需 1-2 分钟（创建 venv 并安装 flask/apscheduler 等依赖）。\n\n• 服务端口固定 5005，安装后通过桌面图标或 http://NAS地址:5005 访问。\n• WebUI 登录校验默认关闭（与定制版一致）：任何能访问 5005 的人都能查看/修改夸克 Cookie 与任务，请只在内网使用，或把本项设为 on 后使用 admin/默认密码登录。\n• 配置与数据保存在应用数据目录，升级、重装不会清空。\n• 「内部更新」在 WebUI 侧边栏，可比对 GitHub 版本并就地更新代码（不动配置）。\n\n• 端口被占用时安装会失败并提示建议端口，改完重新安装即可。"
+      },
+      {
+        "type": "text",
+        "field": "wizard_port",
+        "label": "服务端口",
+        "initValue": "5005",
+        "rules": [
+          {
+            "required": true,
+            "message": "请填写端口"
+          },
+          {
+            "pattern": "^[0-9]+$",
+            "message": "端口只能是数字"
+          }
+        ]
       },
       {
         "type": "text",
@@ -13,8 +29,14 @@
         "label": "WebUI 登录校验（on / off）",
         "initValue": "off",
         "rules": [
-          { "required": true, "message": "请填写 on 或 off" },
-          { "pattern": "^(on|off)$", "message": "只能填 on 或 off" }
+          {
+            "required": true,
+            "message": "请填写 on 或 off"
+          },
+          {
+            "pattern": "^(on|off)$",
+            "message": "只能填 on 或 off"
+          }
         ]
       },
       {
@@ -23,7 +45,10 @@
         "label": "内部更新源（owner/repo）",
         "initValue": "tianlmm/quark-auto-save",
         "rules": [
-          { "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", "message": "格式应为 owner/repo" }
+          {
+            "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+            "message": "格式应为 owner/repo"
+          }
         ]
       },
       {
@@ -32,7 +57,10 @@
         "label": "更新通道（auto / release / tag / branch / url）",
         "initValue": "auto",
         "rules": [
-          { "pattern": "^(auto|release|tag|branch|url)$", "message": "只能填 auto、release、tag、branch 或 url" }
+          {
+            "pattern": "^(auto|release|tag|branch|url)$",
+            "message": "只能填 auto、release、tag、branch 或 url"
+          }
         ]
       },
       {
@@ -41,7 +69,10 @@
         "label": "pip 镜像源",
         "initValue": "https://pypi.tuna.tsinghua.edu.cn/simple",
         "rules": [
-          { "pattern": "^https?://.+$", "message": "请填写 http(s) 地址" }
+          {
+            "pattern": "^https?://.+$",
+            "message": "请填写 http(s) 地址"
+          }
         ]
       }
     ]

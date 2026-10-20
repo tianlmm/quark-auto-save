@@ -1,8 +1,88 @@
 #!/bin/bash
-# install_init — 安装前准备：目录骨架 + 权限自愈
+# install_init — 安装前检查：端口合法性与占用检测
+#
+# fnOS 的向导在安装**前**收集参数，脚本只能通过「失败 + TRIM_TEMP_LOGFILE 提示」把用户送回向导，
+# 所以策略是：被占用就明确报出占用者与建议端口，用户在向导里改完重装即可。
 set -u
+
+PORT="${wizard_port:-5005}"
+BASE_PORT="$PORT"
+
+fail() {
+  echo "FAIL: $1" >&2
+  [ -n "${TRIM_TEMP_LOGFILE:-}" ] && echo "$1" > "${TRIM_TEMP_LOGFILE}"
+  exit 1
+}
+
+# ---------- 1. 合法性 ----------
+case "${PORT}" in
+  ''|*[!0-9]*) fail "端口「${PORT}」不是数字，请填写 1024-65535 之间的端口" ;;
+esac
+if [ "${PORT}" -lt 1024 ] || [ "${PORT}" -gt 65535 ]; then
+  fail "端口 ${PORT} 超出范围，请填写 1024-65535 之间的端口"
+fi
+
+# ---------- 2. 占用检测 ----------
+port_busy() {
+  local p="$1"
+  if command -v ss >/dev/null 2>&1; then
+    [ -n "$(ss -ltnH 2>/dev/null | awk -v p=":${p}$" '$4 ~ p')" ]
+  elif command -v netstat >/dev/null 2>&1; then
+    netstat -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${p}$"
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 - "$p" <<'PY'
+import socket, sys
+p = int(sys.argv[1])
+s = socket.socket()
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+try:
+    s.bind(("0.0.0.0", p))
+except OSError:
+    sys.exit(0)   # 被占用
+finally:
+    s.close()
+sys.exit(1)       # 空闲
+PY
+  else
+    return 1   # 无检测工具，按空闲处理
+  fi
+}
+
+port_owner() {
+  local p="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnpH 2>/dev/null | awk -v p=":${p}$" '$4 ~ p' | head -1
+  elif command -v netstat >/dev/null 2>&1; then
+    netstat -ltnp 2>/dev/null | awk -v p=":${p}$" '$4 ~ p' | head -1
+  fi
+}
+
+if port_busy "${PORT}"; then
+  OWNER="$(port_owner "${PORT}")"
+  [ -n "${OWNER}" ] && OWNER="占用进程：${OWNER}"
+
+  SUGGEST=""
+  i=$((PORT + 1))
+  LIMIT=$((PORT + 50))
+  while [ "${i}" -le "${LIMIT}" ] && [ "${i}" -le 65535 ]; do
+    if ! port_busy "${i}"; then SUGGEST="${i}"; break; fi
+    i=$((i + 1))
+  done
+
+  MSG="端口 ${BASE_PORT} 已被占用。${OWNER}
+请在安装向导里把「服务端口」改为其他端口"
+  if [ -n "${SUGGEST}" ]; then
+    MSG="${MSG}（建议 ${SUGGEST}），改完重新安装。"
+  else
+    MSG="${MSG}，改完重新安装。"
+  fi
+  fail "${MSG}"
+fi
+
+# ---------- 3. 目录骨架 ----------
 mkdir -p "${TRIM_PKGVAR:-/var/apps/quark-auto-save/var}/config" 2>/dev/null || true
 mkdir -p "${TRIM_APPDEST:-/var/apps/quark-auto-save/target}" 2>/dev/null || true
-# 包里若权限过严，服务用户会读不到
 chmod -R a+rX "${TRIM_APPDEST:-/var/apps/quark-auto-save/target}" 2>/dev/null || true
+
+echo "端口 ${PORT} 可用"
 exit 0

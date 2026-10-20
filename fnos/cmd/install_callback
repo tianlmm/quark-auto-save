@@ -42,13 +42,29 @@ if [ ! -f "${VAR_DIR}/config/quark_config.json" ]; then
   cp "${APP_DIR}/quark_config.json" "${VAR_DIR}/config/quark_config.json" || fail "写入默认配置失败"
 fi
 
-# 4. 环境文件（供 service.sh source）——只放登录开关，更新配置写进 JSON
+# 4. 环境文件（供 service.sh source）——端口与登录开关，更新配置写进 JSON
+PORT="${wizard_port:-5005}"
 ENV_FILE="${VAR_DIR}/env.sh"
 cat > "${ENV_FILE}" <<ENVEOF
 # 由 fnOS 安装向导生成，可在「应用设置」里改
+PORT="${PORT}"
 WEBUI_AUTH="${wizard_webui_auth:-off}"
 ENVEOF
 chmod 640 "${ENV_FILE}"
+
+# 4.0 把端口写进桌面入口，保证图标指向实际端口
+"${APP_DIR}/venv/bin/python" - "${APP_DIR}/ui/config" "${PORT}" <<'PYEOF' || echo "WARN: 改写 ui/config 端口失败"
+import json, sys
+path, port = sys.argv[1], str(sys.argv[2])
+with open(path, encoding="utf-8") as f:
+    conf = json.load(f)
+for entry in conf.get(".url", {}).values():
+    entry["port"] = port
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(conf, f, ensure_ascii=False, indent=2)
+print(f"ui/config port={port}")
+PYEOF
+echo "端口：${PORT}"
 
 # 4.1 内部更新配置写入 quark_config.json（WebUI 优先于环境变量）
 REPO="${wizard_update_repo:-tianlmm/quark-auto-save}"
