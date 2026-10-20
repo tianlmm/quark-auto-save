@@ -22,6 +22,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import sys
 import tarfile
@@ -169,15 +170,16 @@ def main():
         with open(os.path.join(app_dir, "build.json"), "w", encoding="utf-8") as f:
             json.dump(build, f, ensure_ascii=False)
 
-        # 内部归档 + 校验和
+        # 内部归档 + 校验和（fnOS 要求 checksum 写在 manifest 里，等于 app.tgz 的 md5）
         app_tgz = os.path.join(root, "app.tgz")
         make_targz(app_dir, app_tgz, arc_prefix="")
         checksum = md5_file(app_tgz)
+        # 外层只放 app.tgz，不要把暂存的 app/ 目录也塞进去（真实 fpk 里没有）
+        shutil.rmtree(app_dir, ignore_errors=True)
+        man["checksum"] = checksum
 
-        # 写 manifest / manifest.checksum
-        write_manifest(os.path.join(root, "manifest"), man, order + [k for k in man if k not in order])
-        with open(os.path.join(root, "manifest.checksum"), "w", encoding="utf-8") as f:
-            f.write(checksum + "\n")
+        fields = [k for k in order if k != "checksum"] + ["checksum"]
+        write_manifest(os.path.join(root, "manifest"), man, fields + [k for k in man if k not in fields])
 
         # 外层 fpk
         fpk_name = f"{appname}_{version}_{args.arch}.fpk"
@@ -191,15 +193,21 @@ def main():
         problems = []
         with tarfile.open(fpk_path, "r:gz") as tar:
             names = set(tar.getnames())
-            for need in ("manifest", "manifest.checksum", "app.tgz", "cmd/main",
-                         "ICON.PNG", "ICON_256.PNG"):
+            for need in ("manifest", "app.tgz", "cmd/main", "ICON.PNG", "ICON_256.PNG"):
                 if need not in names:
                     problems.append(f"缺少 {need}")
+            if "manifest" in names:
+                text = tar.extractfile("manifest").read().decode("utf-8")
+                m = re.search(r"^\s*checksum\s*=\s*([0-9a-f]{32})\s*$", text, re.M)
+                if not m:
+                    problems.append("manifest 缺少 checksum 字段（fnOS 会报数据包不完整）")
+                elif m.group(1) != checksum:
+                    problems.append(f"checksum 不匹配（{m.group(1)} != {checksum}）")
             if "app.tgz" in names:
                 blob = tar.extractfile("app.tgz").read()
                 got = hashlib.md5(blob).hexdigest()
                 if got != checksum:
-                    problems.append(f"manifest.checksum 不匹配（{got} != {checksum}）")
+                    problems.append(f"app.tgz md5 变化（{got} != {checksum}）")
                 with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as inner:
                     inner_names = set(inner.getnames())
                     for need in ("app/run.py", "app/updater.py", "quark_auto_save.py",
