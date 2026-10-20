@@ -10,10 +10,19 @@ PID_FILE="${VAR_DIR}/app.pid"
 mkdir -p "${VAR_DIR}/config" 2>/dev/null || true
 
 is_running() {
-  [ -f "${PID_FILE}" ] || return 1
-  local pid
-  pid="$(cat "${PID_FILE}" 2>/dev/null)"
-  [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null
+  # 1) PID 文件（supervisor）
+  if [ -f "${PID_FILE}" ]; then
+    local pid
+    pid="$(cat "${PID_FILE}" 2>/dev/null)"
+    if [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null; then
+      return 0
+    fi
+  fi
+  # 2) 兜底：PID 文件丢了/被覆盖，但进程其实还在（内部更新重启后会走到这里）
+  if pgrep -f "${APP_DIR}/app/run.py" >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
 }
 
 # 从 env.sh 取端口（安装向导里可能改过）
@@ -81,9 +90,16 @@ case "${1:-}" in
     exit 0
     ;;
   status)
-    is_running || exit 3
-    # 进程活着但端口没监听，视为未就绪
-    port_busy "${SERVICE_PORT}" && exit 0 || exit 3
+    # 应用中心据此显示「打开」还是「停用」：0=运行中，3=未运行。
+    # 只以“进程是否存在”为准；端口没监听可能只是刚启动或换了端口，不能据此判停用，
+    # 否则会出现“明明能打开网页却显示停用”的情况。
+    if is_running; then
+      if ! port_busy "${SERVICE_PORT}"; then
+        echo "[status] 进程在运行，但端口 ${SERVICE_PORT} 未监听（可能正在启动）" >> "${LOG}"
+      fi
+      exit 0
+    fi
+    exit 3
     ;;
   *)
     exit 1
