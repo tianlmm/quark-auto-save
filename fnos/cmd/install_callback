@@ -45,10 +45,18 @@ fi
 # 4. 环境文件（供 service.sh source）——端口与登录开关，更新配置写进 JSON
 PORT="${wizard_port:-5005}"
 ENV_FILE="${VAR_DIR}/env.sh"
+AUTH_RAW="${wizard_webui_auth:-off}"
+case "$(printf '%s' "${AUTH_RAW}" | tr 'A-Z' 'a-z')" in
+  on|1|true|yes|y)  AUTH="on"  ;;
+  off|0|false|no|n|"") AUTH="off" ;;
+  *) echo "WARN: 无法识别 webui_auth=${AUTH_RAW}，按 off（免登录）处理"; AUTH="off" ;;
+esac
+echo "WebUI 登录校验：${AUTH}（on=需要登录 / off=免登录）"
+
 cat > "${ENV_FILE}" <<ENVEOF
 # 由 fnOS 安装向导生成，可在「应用设置」里改
 PORT="${PORT}"
-WEBUI_AUTH="${wizard_webui_auth:-off}"
+WEBUI_AUTH="${AUTH}"
 ENVEOF
 chmod 640 "${ENV_FILE}"
 

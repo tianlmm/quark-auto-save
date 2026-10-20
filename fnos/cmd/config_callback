@@ -53,8 +53,12 @@ if [ "${PORT}" != "${CUR_PORT}" ] && port_busy "${PORT}"; then
 fi
 
 # ---------- 2. 登录开关 ----------
-AUTH="${wizard_webui_auth:-off}"
-case "${AUTH}" in on|off) ;; *) echo "非法 webui_auth=${AUTH}，回退 off"; AUTH="off" ;; esac
+AUTH_RAW="${wizard_webui_auth:-off}"
+case "$(printf '%s' "${AUTH_RAW}" | tr 'A-Z' 'a-z')" in
+  on|1|true|yes|y)  AUTH="on"  ;;
+  off|0|false|no|n|"") AUTH="off" ;;
+  *) echo "无法识别 webui_auth=${AUTH_RAW}，按 off（免登录）处理"; AUTH="off" ;;
+esac
 
 cat > "${VAR_DIR}/env.sh" <<ENVEOF
 # 由 fnOS 应用设置生成

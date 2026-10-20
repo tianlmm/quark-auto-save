@@ -25,7 +25,7 @@
 appcenter-cli install-fpk quark-auto-save_1.0.0_x86.fpk
 ```
 
-安装向导会问：WebUI 登录校验（on/off）、更新源 `owner/repo`、更新通道、pip 镜像。安装时创建 venv 并装依赖，约 1–2 分钟。
+安装向导会问：服务端口、WebUI 登录校验（**on=需要登录 / off=免登录**）、更新源 `owner/repo`、更新通道、pip 镜像。安装时创建 venv 并装依赖，约 1–2 分钟。
 
 | 项 | 位置 |
 |---|---|
@@ -34,7 +34,7 @@ appcenter-cli install-fpk quark-auto-save_1.0.0_x86.fpk
 | 日志 | `/var/apps/quark-auto-save/var/app.log`、`install.log` |
 | 生命周期 | `cmd/main start\|stop\|status`（未运行返回 3） |
 
-> 默认 `WEBUI_AUTH=off`：能访问 5005 就能改任务和 Cookie。只在内网暴露，或在安装向导里选 `on`。
+> 默认 `WEBUI_AUTH=off`（免登录）：能访问该端口就能改任务和 Cookie。只在内网暴露；要登录就设 `WEBUI_AUTH=on`，账号 `admin`，密码在 WebUI 配置里改。
 
 
 ## 端口占用怎么处理

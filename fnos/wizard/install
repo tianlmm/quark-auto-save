@@ -5,7 +5,7 @@
       {
         "type": "tips",
         "label": "",
-        "helpText": "安装约需 1-2 分钟（创建 venv 并安装 flask/apscheduler 等依赖）。\n\n• 服务端口固定 5005，安装后通过桌面图标或 http://NAS地址:5005 访问。\n• WebUI 登录校验默认关闭（与定制版一致）：任何能访问 5005 的人都能查看/修改夸克 Cookie 与任务，请只在内网使用，或把本项设为 on 后使用 admin/默认密码登录。\n• 配置与数据保存在应用数据目录，升级、重装不会清空。\n• 「内部更新」在 WebUI 侧边栏，可比对 GitHub 版本并就地更新代码（不动配置）。\n\n• 端口被占用时安装会失败并提示建议端口，改完重新安装即可。"
+        "helpText": "安装约需 1-2 分钟（创建 venv 并安装 flask/apscheduler 等依赖）。\n\n• 服务端口默认 5005，安装后通过桌面图标或 http://NAS地址:5005 访问；端口被占用时安装会失败并提示建议端口，改完重新安装即可。\n• WebUI 登录校验：填 off = 免登录（任何人访问该端口都能查看/修改夸克 Cookie 与任务，只适合内网）；填 on = 需要登录，账号 admin，密码在 WebUI 配置里改。\n• 配置与数据保存在应用数据目录，升级、重装不会清空。\n• 「内部更新」在 WebUI 侧边栏，可比对 GitHub 版本并就地更新代码（不动配置）。"
       },
       {
         "type": "text",
@@ -26,16 +26,16 @@
       {
         "type": "text",
         "field": "wizard_webui_auth",
-        "label": "WebUI 登录校验（on / off）",
+        "label": "WebUI 登录校验：on = 需要登录，off = 免登录",
         "initValue": "off",
         "rules": [
           {
             "required": true,
-            "message": "请填写 on 或 off"
+            "message": "请填 on 或 off"
           },
           {
-            "pattern": "^(on|off)$",
-            "message": "只能填 on 或 off"
+            "pattern": "^([oO][nN]|[oO][fF][fF])$",
+            "message": "只能填 on（需要登录）或 off（免登录）"
           }
         ]
       },

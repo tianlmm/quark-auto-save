@@ -5,7 +5,7 @@
       {
         "type": "tips",
         "label": "",
-        "helpText": "修改后需要停止再启动应用才会生效。\n\n• WebUI 登录校验：on 使用账号密码登录（admin + 配置里的密码），off 为免登录。\n• 内部更新源：填你自己的仓库（owner/repo）才能收到定制版更新；填上游仓库会把代码更新成上游版本（本地定制会丢失，需在 WebUI 里二次确认）。\n\n• 端口被占用时安装会失败并提示建议端口，改完重新安装即可。"
+        "helpText": "修改后需要停止再启动应用才会生效。\n\n• WebUI 登录校验：on = 需要登录（admin + 配置里的密码），off = 免登录。\n• 内部更新源：填你自己的仓库（owner/repo）才能收到定制版更新；填上游仓库会把代码更新成上游版本（本地定制会丢失，需在 WebUI 里二次确认）。\n• 端口被占用时保存会失败并提示建议端口。"
       },
       {
         "type": "text",
@@ -26,16 +26,16 @@
       {
         "type": "text",
         "field": "wizard_webui_auth",
-        "label": "WebUI 登录校验（on / off）",
+        "label": "WebUI 登录校验：on = 需要登录，off = 免登录",
         "initValue": "off",
         "rules": [
           {
             "required": true,
-            "message": "请填写 on 或 off"
+            "message": "请填 on 或 off"
           },
           {
-            "pattern": "^(on|off)$",
-            "message": "只能填 on 或 off"
+            "pattern": "^([oO][nN]|[oO][fF][fF])$",
+            "message": "只能填 on（需要登录）或 off（免登录）"
           }
         ]
       },
