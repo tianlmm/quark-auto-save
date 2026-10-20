@@ -42,7 +42,7 @@ SIGNATURES = [
 ]
 
 # 更新时必须保留的本地路径（远端包通常没有：fnOS 桌面入口等）
-PRESERVE_PATHS = ["app/ui", "service.sh"]
+PRESERVE_PATHS = ["service.sh"]
 
 DEFAULT_CONFIG = {
     "repo": "tianlmm/quark-auto-save",
@@ -289,6 +289,7 @@ class Updater:
             backup = self._backup()
             try:
                 self._swap(stage)
+                self._sync_ui(stage, backup)
                 self._restore_preserved(backup)
                 self._write_build(latest)
                 deps_ok, deps_msg = (True, "")
@@ -418,6 +419,24 @@ class Updater:
                                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
             else:
                 shutil.copy2(src, dst)
+
+    def _sync_ui(self, stage, backup):
+        """仓库里的 fnos/ui → 运行目录的 app/ui。
+
+        源码包只有 fnos/ui，没有 app/ui，所以更新时要手工映射，
+        否则内部更新后桌面入口会停留在旧配置（例如仍是端口入口，FN Connect 打不开）。
+        """
+        src = os.path.join(stage, "fnos", "ui")
+        live = os.path.join(self.root, "app", "ui")
+        if os.path.isdir(src):
+            shutil.rmtree(live, ignore_errors=True)
+            shutil.copytree(src, live)
+            self.log("已同步 app/ui（桌面入口）")
+        elif not os.path.exists(live):
+            saved = os.path.join(backup, "app", "ui")
+            if os.path.isdir(saved):
+                shutil.copytree(saved, live)
+                self.log("远端无 fnos/ui，沿用备份中的桌面入口")
 
     def _restore_preserved(self, backup):
         """远端包里没有的本地文件（桌面入口等）从备份恢复，否则 fnOS 图标会消失。"""
