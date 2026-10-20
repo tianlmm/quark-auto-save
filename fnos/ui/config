@@ -3,7 +3,7 @@
     "quark-auto-save.main": {
       "title": "夸克自动转存",
       "desc": "夸克网盘自动转存、整理、推送",
-      "icon": "images/icon.png",
+      "icon": "images/icon_{0}.png",
       "type": "iframe",
       "protocol": "",
       "gatewayPrefix": "/app/quark-auto-save",

@@ -1,5 +1,5 @@
 appname                    = quark-auto-save
-version                    = 1.0.7
+version                    = 1.0.8
 display_name               = 夸克自动转存
 desc                       = 夸克网盘签到、自动转存、命名整理、链接失效自动换链、推送与媒体库刷新（原生应用 + 应用内更新）
 platform                   = x86
@@ -14,6 +14,6 @@ ctl_stop                   = true
 checkport                  = false
 service_port               = 5005
 desktop_uidir              = ui
-desktop_applaunchname      = quark-auto-save.panel
+desktop_applaunchname      = quark-auto-save.main
 disable_authorization_path = false
 changelog                  = 1.0.0-1：原生应用形态；内置应用内更新（检查/下载/原子替换/失败回滚/自动重启）；保留链接失效自动换链；WebUI 免登录可开关（WEBUI_AUTH）

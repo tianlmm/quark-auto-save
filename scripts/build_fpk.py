@@ -143,7 +143,8 @@ def main():
     appname = man["appname"]
     version = man["version"]
     required = ("cmd/main", "config/privilege", "config/resource",
-                "ICON.PNG", "ICON_256.PNG", "ui/config")
+                "ICON.PNG", "ICON_256.PNG", "ui/config",
+                "ui/images/icon_64.png", "ui/images/icon_256.png")
     missing = [f for f in required if not os.path.exists(os.path.join(pkg, f))]
     if missing:
         raise SystemExit("工程缺少必需文件：" + "、".join(missing))
