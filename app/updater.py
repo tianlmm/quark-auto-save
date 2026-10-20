@@ -442,6 +442,14 @@ class Updater:
         }
         with open(os.path.join(self.root, "build.json"), "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False)
+        # 同步 VERSION，避免源码形态与 build.json 版本不一致
+        ver = str(latest.get("version") or latest.get("tag") or "").lstrip("v")
+        if ver:
+            try:
+                with open(os.path.join(self.root, "VERSION"), "w", encoding="utf-8") as f:
+                    f.write(ver + "\n")
+            except Exception:
+                pass
 
     def _pip_install(self):
         req = os.path.join(self.root, "requirements.txt")
