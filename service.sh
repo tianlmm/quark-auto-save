@@ -18,6 +18,9 @@ export PORT="${PORT:-${TRIM_SERVICE_PORT:-5005}}"
 export HOST="${HOST:-0.0.0.0}"
 export CONFIG_PATH="${CONFIG_PATH:-${VAR_DIR}/config/quark_config.json}"
 export WEBUI_AUTH="${WEBUI_AUTH:-off}"
+# fnOS 统一网关：桌面图标 / FN Connect 走 Unix Socket
+export GATEWAY_SOCKET="${GATEWAY_SOCKET:-${APP_DIR}/app.sock}"
+export GATEWAY_PREFIX="${GATEWAY_PREFIX:-/app/quark-auto-save}"
 export TZ="${TZ:-Asia/Shanghai}"
 export PYTHONUNBUFFERED=1
 export PYTHONDONTWRITEBYTECODE=1

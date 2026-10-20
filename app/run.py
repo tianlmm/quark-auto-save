@@ -77,6 +77,9 @@ DEBUG = os.environ.get("DEBUG", "false").lower() == "true"
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = os.environ.get("PORT", 5005)
 TASK_TIMEOUT = int(os.environ.get("TASK_TIMEOUT", 1800))
+# fnOS 统一网关（FN Connect / 桌面图标走这里；留空则不启用）
+GATEWAY_SOCKET = os.environ.get("GATEWAY_SOCKET", "")
+GATEWAY_PREFIX = os.environ.get("GATEWAY_PREFIX", "").rstrip("/")
 
 config_data = {}
 task_plugins_config_default = {}
@@ -179,7 +182,10 @@ def index():
     if not is_login():
         return redirect(url_for("login"))
     return render_template(
-        "index.html", version=app.config["APP_VERSION"], plugin_flags=PLUGIN_FLAGS
+        "index.html",
+        version=app.config["APP_VERSION"],
+        plugin_flags=PLUGIN_FLAGS,
+        base=GATEWAY_PREFIX,
     )
 
 
@@ -712,6 +718,9 @@ def init():
 if __name__ == "__main__":
     init()
     reload_tasks()
+    if GATEWAY_SOCKET:
+        from unixgateway import start as start_gateway
+        start_gateway(GATEWAY_SOCKET, "127.0.0.1", int(PORT), GATEWAY_PREFIX)
     logging.info(">>> 启动Web服务")
     logging.info(f"运行在: http://{HOST}:{PORT}")
     app.run(

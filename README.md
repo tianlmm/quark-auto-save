@@ -37,6 +37,21 @@ appcenter-cli install-fpk quark-auto-save_1.0.0_x86.fpk
 > 默认 `WEBUI_AUTH=off`（免登录）：能访问该端口就能改任务和 Cookie。只在内网暴露；要登录就设 `WEBUI_AUTH=on`，账号 `admin`，密码在 WebUI 配置里改。
 
 
+
+## 远程访问（FN Connect / 桌面图标）
+
+桌面图标走的是飞牛**统一网关**，不是端口：应用在 `${TRIM_APPDEST}/app.sock` 上监听 Unix Socket，
+`ui/config` 用 `gatewayPrefix` / `gatewaySocket` 注册，飞牛先校验 NAS 登录态再转发进来。
+
+- 网关前缀：`/app/quark-auto-save`
+- 好处：FN Connect 远程可用、复用 NAS 域名与登录态；
+- 兼容：端口仍然监听（默认 5005），局域网直接输 `http://NAS:端口` 也能用；
+- 前端所有接口调用都带 `BASE` 前缀（网关访问时为 `/app/quark-auto-save`，端口访问时为空串），
+  所以两种入口共用一套页面，不需要两套构建。
+
+> 早期版本只配了端口入口（`type: iframe` + `port`），FN Connect 会提示"暂无权限访问该服务"，
+> 因为端口入口不参与网关转发、也不继承登录态。
+
 ## 端口占用怎么处理
 
 安装向导第一步就问「服务端口」（默认 5005），`install_init` 会当场检查：

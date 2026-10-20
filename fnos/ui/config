@@ -1,13 +1,16 @@
 {
   ".url": {
-    "quark-auto-save.panel": {
+    "quark-auto-save.main": {
       "title": "夸克自动转存",
+      "desc": "夸克网盘自动转存、整理、推送",
       "icon": "images/icon.png",
       "type": "iframe",
       "protocol": "",
-      "port": "5005",
-      "url": "/",
-      "allUsers": true
+      "gatewayPrefix": "/app/quark-auto-save",
+      "gatewaySocket": "app.sock",
+      "url": "/app/quark-auto-save/",
+      "allUsers": true,
+      "microApp": true
     }
   }
 }

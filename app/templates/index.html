@@ -656,6 +656,8 @@
 
 
   <script>
+    // fnOS 统一网关访问时，接口需要带上前缀；端口直连时为空串
+    var BASE = "[[ base ]]";
     var app = new Vue({
       el: '#app',
       data: {
@@ -779,7 +781,7 @@
           this.upd.checking = true;
           this.upd.error = "";
           if (!silent) this.upd.message = "";
-          axios.get('/api/update/check')
+          axios.get(BASE + '/api/update/check')
             .then(res => {
               const d = res.data || {};
               if (!d.success) { this.upd.error = d.message || '检查更新失败'; return; }
@@ -800,12 +802,12 @@
           this.upd.error = "";
           this.upd.detail = "";
           this.upd.message = "正在下载并替换代码…";
-          axios.post('/api/update/apply', {})
+          axios.post(BASE + '/api/update/apply', {})
             .then(res => {
               const d = res.data || {};
               if (!d.success && (d.message || '').indexOf('本地定制') >= 0) {
                 if (confirm(d.message + '\n\n仍要强制覆盖吗？（本地定制功能会丢失）')) {
-                  return axios.post('/api/update/apply', { force: true })
+                  return axios.post(BASE + '/api/update/apply', { force: true })
                     .then(r2 => this.handleUpdateResult(r2.data || {}));
                 }
                 this.upd.error = d.message;
@@ -831,7 +833,7 @@
           }
         },
         fetchData() {
-          axios.get('/data')
+          axios.get(BASE + '/data')
             .then(response => {
               config_data = response.data.data
               // cookie兼容
@@ -908,7 +910,7 @@
           }
         },
         saveConfig() {
-          axios.post('/update', this.formData)
+          axios.post(BASE + '/update', this.formData)
             .then(response => {
               if (response.data.success) {
                 this.configModified = false;
@@ -1012,7 +1014,7 @@
             console.error("Error decodeURIComponent:", e);
           }
           // 从分享中提取任务名
-          axios.post('/get_share_detail', {
+          axios.post(BASE + '/get_share_detail', {
             shareurl: task.shareurl
           }).then(response => {
             share_detail = response.data.data
@@ -1167,7 +1169,7 @@
           this.smart_param.taskSuggestions = {};
           this.smart_param.index = index;
           try {
-            axios.get('/task_suggestions', {
+            axios.get(BASE + '/task_suggestions', {
               params: {
                 q: taskname,
                 d: deep
@@ -1203,7 +1205,7 @@
             const item = data[idx++];
             // 只验证未知链接
             if (item.verify !== undefined) { next(); return; }
-            axios.post('/get_share_detail', { shareurl: item.shareurl })
+            axios.post(BASE + '/get_share_detail', { shareurl: item.shareurl })
               .then(res => {
                 if (this.smart_param.isSearching) return;
                 this.$set(item, 'verify', res.data.success);
@@ -1250,7 +1252,7 @@
         },
         deleteFile(fid, fname, isDir) {
           if (fid != "" && confirm(`确认删除${isDir ? '目录' : '文件'} [${fname}] 吗？`))
-            axios.post('/delete_file', {
+            axios.post(BASE + '/delete_file', {
               fid: fid
             }).then(response => {
               if (response.data.code == 0) {
@@ -1269,7 +1271,7 @@
             params = { fid: params }
           }
           this.modalLoading = true;
-          axios.get('/get_savepath_detail', {
+          axios.get(BASE + '/get_savepath_detail', {
             params: params
           }).then(response => {
             this.fileSelect.fileList = response.data.data.list;
@@ -1299,7 +1301,7 @@
         },
         getShareDetail() {
           this.modalLoading = true;
-          axios.post('/get_share_detail', {
+          axios.post(BASE + '/get_share_detail', {
             shareurl: this.fileSelect.shareurl,
             stoken: this.fileSelect.stoken,
             task: this.formData.tasklist[this.fileSelect.index],

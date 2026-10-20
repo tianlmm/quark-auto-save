@@ -1,5 +1,5 @@
 appname                    = quark-auto-save
-version                    = 1.0.4
+version                    = 1.0.5
 display_name               = 夸克自动转存
 desc                       = 夸克网盘签到、自动转存、命名整理、链接失效自动换链、推送与媒体库刷新（原生应用 + 应用内更新）
 platform                   = x86
@@ -9,6 +9,7 @@ maintainer_url             = https://github.com/tianlmm
 distributor                = kkzdzc
 distributor_url            = https://github.com/tianlmm
 os_min_version             = 0.9.0
+micro_app                  = true
 ctl_stop                   = true
 checkport                  = false
 service_port               = 5005

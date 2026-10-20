@@ -67,6 +67,8 @@ path, port = sys.argv[1], str(sys.argv[2])
 with open(path, encoding="utf-8") as f:
     conf = json.load(f)
 for entry in conf.get(".url", {}).values():
+    if entry.get("gatewayPrefix"):
+        continue          # 网关入口忽略 port
     entry["port"] = port
 with open(path, "w", encoding="utf-8") as f:
     json.dump(conf, f, ensure_ascii=False, indent=2)
