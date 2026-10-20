@@ -69,7 +69,13 @@ def get_app_ver():
 
 
 # 文件路径
-PYTHON_PATH = "python3" if os.path.exists("/usr/bin/python3") else "python"
+# 子进程必须复用当前解释器：原生安装时依赖装在 target/venv，
+# 写死 "python3" 会用到系统 python，任务一执行就 ModuleNotFoundError。
+PYTHON_PATH = (
+    os.environ.get("PYTHON_PATH", "").strip()
+    or sys.executable
+    or ("python3" if os.path.exists("/usr/bin/python3") else "python")
+)
 SCRIPT_PATH = os.environ.get("SCRIPT_PATH", "./quark_auto_save.py")
 CONFIG_PATH = os.environ.get("CONFIG_PATH", "./config/quark_config.json")
 PLUGIN_FLAGS = os.environ.get("PLUGIN_FLAGS", "")
@@ -608,7 +614,7 @@ def run_python(args):
     logging.info(f">>> 定时运行任务")
     try:
         result = subprocess.run(
-            f"{PYTHON_PATH} {args}",
+            f'"{PYTHON_PATH}" {args}',
             shell=True,
             timeout=TASK_TIMEOUT,
             capture_output=True,
@@ -726,6 +732,7 @@ if __name__ == "__main__":
     if GATEWAY_SOCKET:
         from unixgateway import start as start_gateway
         start_gateway(GATEWAY_SOCKET, "127.0.0.1", int(PORT), GATEWAY_PREFIX)
+    logging.info(f">>> 任务子进程解释器: {PYTHON_PATH}")
     logging.info(">>> 启动Web服务")
     logging.info(f"运行在: http://{HOST}:{PORT}")
     app.run(
