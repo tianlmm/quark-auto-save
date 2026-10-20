@@ -181,11 +181,16 @@ def logout():
 def index():
     if not is_login():
         return redirect(url_for("login"))
+    # 只有“经网关转发进来”的请求才需要前端带前缀；端口直连时必须是空串，
+    # 否则前端会拼出 /app/xxx/api/... 这种不存在的路径（表现为检查更新 404）。
+    base = request.headers.get("X-Forwarded-Prefix", "")
+    if not base and GATEWAY_PREFIX and request.path.startswith(GATEWAY_PREFIX):
+        base = GATEWAY_PREFIX
     return render_template(
         "index.html",
         version=app.config["APP_VERSION"],
         plugin_flags=PLUGIN_FLAGS,
-        base=GATEWAY_PREFIX,
+        base=base.rstrip("/"),
     )
 
 

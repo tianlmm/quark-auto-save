@@ -160,6 +160,9 @@ class Gateway:
             hdrs = dict(headers)
             hdrs["Connection"] = "close"
             hdrs.pop("Host", None)
+            if self.prefix:
+                # 告诉上游“这次是带着网关前缀进来的”，页面据此拼接口地址
+                hdrs["X-Forwarded-Prefix"] = self.prefix
 
             up = http.client.HTTPConnection(self.host, self.port, timeout=300)
             try:

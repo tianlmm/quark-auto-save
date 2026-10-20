@@ -1,5 +1,5 @@
 appname                    = quark-auto-save
-version                    = 1.0.5
+version                    = 1.0.6
 display_name               = 夸克自动转存
 desc                       = 夸克网盘签到、自动转存、命名整理、链接失效自动换链、推送与媒体库刷新（原生应用 + 应用内更新）
 platform                   = x86
